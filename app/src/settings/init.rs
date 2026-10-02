@@ -27,6 +27,7 @@ use crate::ai::cloud_agent_settings::CloudAgentSettings;
 use crate::appearance;
 use crate::banner::BannerState;
 use crate::drive::settings::WarpDriveSettings;
+use crate::pr_stack::PrStackSettings;
 use crate::resource_center::TipsCompleted;
 use crate::search::command_search::settings::CommandSearchSettings;
 use crate::terminal::BlockListSettings;
@@ -78,6 +79,7 @@ pub fn register_all_settings(ctx: &mut AppContext) {
     AISettings::register_and_subscribe_to_events(ctx);
     CloudAgentSettings::register(ctx);
     CliChatViewSettings::register(ctx);
+    PrStackSettings::register(ctx);
     ScrollSettings::register(ctx);
     SelectionSettings::register(ctx);
     InputModeSettings::register(ctx);

@@ -54,6 +54,7 @@ mod notification;
 mod palette;
 mod persistence;
 mod platform;
+mod pr_stack;
 mod prefix;
 #[cfg(target_os = "macos")]
 mod preview_config_migration;

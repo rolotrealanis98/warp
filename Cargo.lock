@@ -15331,6 +15331,7 @@ dependencies = [
  "getrandom 0.2.16",
  "getset",
  "git2",
+ "globset",
  "gloo",
  "handlebars",
  "hashbrown 0.17.1",

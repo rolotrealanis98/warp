@@ -108,6 +108,7 @@ float-cmp.workspace = true
 futures-lite.workspace = true
 futures-util.workspace = true
 futures.workspace = true
+globset.workspace = true
 fuzzy_match.workspace = true
 getset.workspace = true
 handlebars.workspace = true
