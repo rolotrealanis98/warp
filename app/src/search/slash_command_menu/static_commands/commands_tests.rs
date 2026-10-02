@@ -548,6 +548,55 @@ fn natural_language_detection_command_is_ai_enabled_and_executes_immediately() {
 }
 
 #[test]
+fn cli_agent_commands_are_always_available_in_the_gui() {
+    let gui_commands = all_commands(settings::SettingsMode::Gui);
+
+    for (kind, name) in [
+        (SlashCommandKind::Task, "/task"),
+        (SlashCommandKind::Chat, "/chat"),
+        (SlashCommandKind::Resume, "/resume"),
+        (SlashCommandKind::Claude, "/claude"),
+    ] {
+        let command = gui_commands
+            .iter()
+            .find(|command| command.kind == kind)
+            .unwrap_or_else(|| panic!("expected {name} to be registered in GUI mode"));
+        assert_eq!(command.name, name);
+        assert_eq!(command.availability, Availability::ALWAYS, "{name}");
+        assert!(
+            command.is_active(Availability::TERMINAL_VIEW),
+            "{name} should be active without Warp AI"
+        );
+        assert!(!command.auto_enter_ai_mode, "{name}");
+    }
+}
+
+#[test]
+fn cli_agent_commands_are_not_registered_for_tui_mode() {
+    let tui_commands = all_commands(settings::SettingsMode::Tui);
+
+    assert!(tui_commands.iter().all(|command| !matches!(
+        command.kind,
+        SlashCommandKind::Task
+            | SlashCommandKind::Chat
+            | SlashCommandKind::Resume
+            | SlashCommandKind::Claude
+    )));
+}
+
+#[test]
+fn claude_command_takes_an_optional_first_message() {
+    let argument = CLAUDE
+        .argument
+        .as_ref()
+        .expect("expected /claude to take an argument");
+
+    assert!(argument.is_optional);
+    assert!(argument.should_execute_on_selection);
+    assert_eq!(argument.hint_text, Some("<first message>"));
+}
+
+#[test]
 fn theme_command_is_registered_only_for_tui_mode() {
     let tui_commands = all_commands(settings::SettingsMode::Tui);
     let command = tui_commands

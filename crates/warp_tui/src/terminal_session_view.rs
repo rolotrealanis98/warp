@@ -4935,7 +4935,11 @@ impl TuiTerminalSessionView {
             | SlashCommandKind::ContinueLocally
             | SlashCommandKind::RemoteControl
             | SlashCommandKind::Prompts
-            | SlashCommandKind::Rewind => {
+            | SlashCommandKind::Rewind
+            | SlashCommandKind::Task
+            | SlashCommandKind::Chat
+            | SlashCommandKind::Resume
+            | SlashCommandKind::Claude => {
                 debug_assert!(
                     false,
                     "Attempted to execute GUI-only slash command in the TUI: {}",

@@ -53,6 +53,7 @@ use crate::server::ids::SyncId;
 use crate::server::telemetry::{AgentModeAutoDetectionSettingOrigin, SlashCommandAcceptedDetails};
 use crate::settings::AISettings;
 use crate::tab::SelectedTabColor;
+use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::terminal::input::decorations::InputBackgroundJobOptions;
 use crate::terminal::input::inline_menu::{InlineMenuAction, InlineMenuType};
 use crate::terminal::input::message_bar::Message;
@@ -906,6 +907,39 @@ impl Input {
             SlashCommandKind::OpenCodeReview => {
                 ctx.dispatch_typed_action(&TerminalAction::ToggleCodeReviewPane {
                     entrypoint: CodeReviewPaneEntrypoint::SlashCommand,
+                });
+            }
+            SlashCommandKind::Task => {
+                ctx.dispatch_typed_action(&WorkspaceAction::OpenTaskAgentModal);
+            }
+            SlashCommandKind::Chat => {
+                if CLIAgentSessionsModel::as_ref(ctx)
+                    .session(self.terminal_view_id)
+                    .is_none()
+                {
+                    show_error_toast("No CLI agent is running in this pane".to_owned(), ctx);
+                    return true;
+                }
+                ctx.dispatch_typed_action(&TerminalAction::ToggleCliChatView);
+            }
+            SlashCommandKind::Resume => {
+                let cwd = self.ai_context_model.as_ref(ctx).current_pwd();
+                AgentConversationsModel::handle(ctx).update(ctx, |model, ctx| {
+                    model.refresh_claude_history(cwd.map(PathBuf::from), ctx);
+                });
+                if FeatureFlag::AgentView.is_enabled() {
+                    self.open_conversation_menu(ctx);
+                    self.inline_conversation_menu_view
+                        .update(ctx, |menu, ctx| menu.select_current_directory_tab(ctx));
+                } else {
+                    ctx.dispatch_typed_action(&WorkspaceAction::OpenConversationListView);
+                }
+            }
+            SlashCommandKind::Claude => {
+                ctx.emit(Event::StartClaudeCode {
+                    prompt: argument
+                        .map(|argument| argument.trim().to_owned())
+                        .unwrap_or_default(),
                 });
             }
             SlashCommandKind::OpenMcpServers | SlashCommandKind::Mcp => {

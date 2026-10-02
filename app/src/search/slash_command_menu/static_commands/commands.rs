@@ -893,6 +893,62 @@ pub const COPY_DEBUGGING_ID: StaticCommand = StaticCommand {
     argument: None,
 };
 
+// Fork: commands that drive CLI agents (see FORK.md). Always available: none needs Warp AI.
+// ponytail: no `/jira` or `/pr` yet; add them here once the issue picker and PR review modal
+// have workspace actions to dispatch.
+
+pub const TASK: StaticCommand = StaticCommand {
+    name: "/task",
+    description: "Start a CLI agent on a task",
+    kind: SlashCommandKind::Task,
+    supported_surfaces: SlashCommandSurfaces::GuiOnly {
+        icon_path: "bundled/svg/block-tasklist.svg",
+    },
+    availability: Availability::ALWAYS,
+    auto_enter_ai_mode: false,
+    argument: None,
+};
+
+pub const CHAT: StaticCommand = StaticCommand {
+    name: "/chat",
+    description: "Toggle the chat view of this pane's CLI agent",
+    kind: SlashCommandKind::Chat,
+    supported_surfaces: SlashCommandSurfaces::GuiOnly {
+        icon_path: "bundled/svg/message-chat-square.svg",
+    },
+    availability: Availability::ALWAYS,
+    auto_enter_ai_mode: false,
+    argument: None,
+};
+
+pub const RESUME: StaticCommand = StaticCommand {
+    name: "/resume",
+    description: "Resume a Claude Code session from this directory",
+    kind: SlashCommandKind::Resume,
+    supported_surfaces: SlashCommandSurfaces::GuiOnly {
+        icon_path: "bundled/svg/history.svg",
+    },
+    availability: Availability::ALWAYS,
+    auto_enter_ai_mode: false,
+    argument: None,
+};
+
+pub static CLAUDE: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
+    name: "/claude",
+    description: "Start Claude Code in this directory",
+    kind: SlashCommandKind::Claude,
+    supported_surfaces: SlashCommandSurfaces::GuiOnly {
+        icon_path: "bundled/svg/claude.svg",
+    },
+    availability: Availability::ALWAYS,
+    auto_enter_ai_mode: false,
+    argument: Some(
+        Argument::optional()
+            .with_hint_text("<first message>")
+            .with_execute_on_selection(),
+    ),
+});
+
 pub static COMMAND_REGISTRY: LazyLock<Registry> = LazyLock::new(Registry::new);
 
 /// A unique identifier for a static slash command.
@@ -1011,6 +1067,10 @@ fn all_commands_for_all_surfaces() -> Vec<StaticCommand> {
         STATUS,
         VIEW_LOGS,
         VOICE,
+        TASK,
+        CHAT,
+        RESUME,
+        CLAUDE.clone(),
     ];
 
     if FeatureFlag::LocalDockerSandbox.is_enabled() {

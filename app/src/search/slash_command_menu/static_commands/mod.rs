@@ -118,6 +118,11 @@ pub enum SlashCommandKind {
     VimMode,
     Status,
     CopyDebuggingId,
+    // Fork: CLI agent commands.
+    Task,
+    Chat,
+    Resume,
+    Claude,
 }
 
 /// The application surfaces on which a static slash command is implemented.
