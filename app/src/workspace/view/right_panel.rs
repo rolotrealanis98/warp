@@ -42,11 +42,11 @@ use crate::pane_group::{
     Event as PaneGroupEvent, PaneGroup, WorkingDirectoriesEvent, WorkingDirectoriesModel,
 };
 use crate::settings::{AISettings, AISettingsChangedEvent};
-use crate::terminal::CLIAgent;
 use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::terminal::input::MenuPositioning;
 use crate::terminal::resizable_data::{ModalType, ResizableData};
 use crate::terminal::view::TerminalView;
+use crate::terminal::{CLIAgent, cli_agent};
 use crate::ui_components::buttons::icon_button_with_color;
 use crate::ui_components::icons;
 use crate::util::bindings::{CustomAction, keybinding_name_to_display_string};
@@ -65,9 +65,8 @@ use crate::workspace::view::TOGGLE_RIGHT_PANEL_BINDING_NAME;
 pub enum ReviewDestination {
     /// No terminal is available to receive comments.
     None,
-    /// A Warp agent terminal is available (input box visible, not executing).
-    Warp,
-    /// A CLI agent (e.g. Claude Code, Gemini) is running in a terminal.
+    /// A CLI agent (e.g. Claude Code, Gemini) runs in an available terminal, or Claude Code will
+    /// be started in an idle one (fork: there is no Warp agent destination).
     Cli(CLIAgent),
 }
 
@@ -1312,8 +1311,8 @@ impl RightPanelView {
             return;
         };
 
-        let ai_enabled = AISettings::as_ref(ctx).is_any_ai_enabled(ctx);
-        let chosen = self.find_review_terminal(pane_group, repo_path, ai_enabled, ctx);
+        // Fork: an idle terminal qualifies without Warp AI; it starts Claude Code below.
+        let chosen = self.find_review_terminal(pane_group, repo_path, true, ctx);
 
         let Some(terminal_view) = chosen else {
             log::warn!("No available terminal found for submitting review comments");
@@ -1348,10 +1347,10 @@ impl RightPanelView {
             };
             (r, dest)
         } else {
-            let r = terminal_view.update(ctx, |terminal, ctx| {
-                terminal.send_inline_review(comments, ctx)
+            terminal_view.update(ctx, |terminal, ctx| {
+                terminal.start_claude_code(cli_agent::build_review_prompt(&comments), ctx);
             });
-            (r, CodeReviewContextDestination::AgentReview)
+            (Ok(()), CodeReviewContextDestination::Pty)
         };
 
         if let Err(err) = &result {
@@ -1670,15 +1669,12 @@ impl RightPanelView {
             return;
         };
 
-        let ai_enabled = AISettings::as_ref(ctx).is_any_ai_enabled(ctx);
+        // Fork: an idle terminal in the repo starts Claude Code with the comments.
         let destination = self
-            .find_review_terminal(pane_group, &repo_path, ai_enabled, ctx)
+            .find_review_terminal(pane_group, &repo_path, true, ctx)
             .map(|tv| {
-                tv.read(ctx, |t, ctx| {
-                    t.active_cli_agent(ctx)
-                        .map(ReviewDestination::Cli)
-                        .unwrap_or(ReviewDestination::Warp)
-                })
+                let agent = tv.read(ctx, |t, ctx| t.active_cli_agent(ctx));
+                ReviewDestination::Cli(agent.unwrap_or(CLIAgent::Claude))
             })
             .unwrap_or(ReviewDestination::None);
 
