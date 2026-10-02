@@ -64,9 +64,26 @@ impl Workspace {
         if !FeatureFlag::TaskAgentLauncher.is_enabled() {
             return;
         }
-        let session = self.active_session_view(ctx);
-        let repo_root = session
-            .as_ref()
+        let mut request = self.task_agent_draft_for_active_session(ctx);
+        if mode == TaskAgentModalMode::Rename
+            && let Some(task) = self
+                .active_session_view(ctx)
+                .and_then(|view| TaskSessionsModel::as_ref(ctx).get(view.id()).cloned())
+        {
+            request.key = task.key;
+            request.title = task.title;
+        }
+        self.open_task_agent_modal(mode, request, ctx);
+    }
+
+    /// An empty request for the active session's repository: its git root, else its cwd, else
+    /// the first known workspace.
+    pub(super) fn task_agent_draft_for_active_session(
+        &self,
+        ctx: &mut ViewContext<Self>,
+    ) -> TaskAgentRequest {
+        let repo_root = self
+            .active_session_view(ctx)
             .and_then(|view| {
                 let view = view.as_ref(ctx);
                 view.current_local_repo_path()
@@ -80,15 +97,7 @@ impl Workspace {
                     .map(|workspace| workspace.path.clone())
             })
             .unwrap_or_default();
-        let mut request = TaskAgentRequest::draft(repo_root, ctx);
-        if mode == TaskAgentModalMode::Rename
-            && let Some(task) =
-                session.and_then(|view| TaskSessionsModel::as_ref(ctx).get(view.id()).cloned())
-        {
-            request.key = task.key;
-            request.title = task.title;
-        }
-        self.open_task_agent_modal(mode, request, ctx);
+        TaskAgentRequest::draft(repo_root, ctx)
     }
 
     /// Opens the task agent modal prefilled from `request`.

@@ -19,6 +19,7 @@ mod pr_agent;
 pub(crate) mod right_panel;
 mod startup_directory;
 mod tab_grouping;
+mod jira;
 mod task_agent;
 #[cfg(test)]
 #[path = "view_tests.rs"]
@@ -1118,6 +1119,7 @@ pub struct Workspace {
     new_worktree_modal: ModalViewState<Modal<NewWorktreeModal>>,
     task_agent_modal: ModalViewState<Modal<crate::task_agent::TaskAgentModal>>,
     pr_agent_modal: ModalViewState<Modal<crate::pr_agent::PrAgentModal>>,
+    jira_modal: ModalViewState<Modal<crate::jira::JiraIssuePicker>>,
     close_session_confirmation_dialog: ViewHandle<CloseSessionConfirmationDialog>,
     rewind_confirmation_dialog: ViewHandle<RewindConfirmationDialog>,
     delete_conversation_confirmation_dialog: ViewHandle<DeleteConversationConfirmationDialog>,
@@ -3100,6 +3102,7 @@ impl Workspace {
         let new_worktree_modal = Self::build_new_worktree_modal(ctx);
         let task_agent_modal = Self::build_task_agent_modal(ctx);
         let pr_agent_modal = Self::build_pr_agent_modal(ctx);
+        let jira_modal = Self::build_jira_modal(ctx);
 
         let session_config_modal = Self::build_session_config_modal(ctx);
 
@@ -3506,6 +3509,7 @@ impl Workspace {
             new_worktree_modal,
             task_agent_modal,
             pr_agent_modal,
+            jira_modal,
             close_session_confirmation_dialog,
             rewind_confirmation_dialog,
             delete_conversation_confirmation_dialog,
@@ -24427,6 +24431,7 @@ impl TypedActionView for Workspace {
             OpenPrAgentPullRequest(terminal_view_id) => {
                 self.open_pr_agent_pull_request(*terminal_view_id, ctx)
             }
+            Jira(command) => self.handle_jira_command(*command, ctx),
             OpenTabConfigErrorFile {
                 #[cfg_attr(not(feature = "local_fs"), allow(unused_variables))]
                 path,
@@ -27652,6 +27657,10 @@ impl View for Workspace {
 
         if self.pr_agent_modal.is_open() {
             stack.add_child(self.pr_agent_modal.render());
+        }
+
+        if self.jira_modal.is_open() {
+            stack.add_child(self.jira_modal.render());
         }
 
         if self.workflow_modal.as_ref(app).is_open() {

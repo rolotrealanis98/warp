@@ -846,6 +846,8 @@ pub enum WorkspaceAction {
     OpenPrAgentModal,
     /// Open the pull request a PR agent pane watches and clear its unread updates.
     OpenPrAgentPullRequest(EntityId),
+    /// A Jira command palette entry (issue picker, or a write on the active pane's issue).
+    Jira(crate::jira::JiraCommand),
     /// Create a new worktree in the given repo using the default worktree tab config.
     /// The branch name is auto-generated.
     OpenWorktreeInRepo {
@@ -1119,6 +1121,7 @@ impl WorkspaceAction {
             | RenameSessionFromTask
             | OpenPrAgentModal
             | OpenPrAgentPullRequest(_)
+            | Jira(_)
             | OpenWorktreeInRepo { .. }
             | OpenWorktreeAddRepoPicker
             | Crash
