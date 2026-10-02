@@ -144,6 +144,7 @@ const ALL_SECTIONS: &[SettingsSection] = &[
     SettingsSection::AgentMCPServers,
     SettingsSection::Knowledge,
     SettingsSection::ThirdPartyCLIAgents,
+    SettingsSection::TaskAgents,
     SettingsSection::CodeIndexing,
     SettingsSection::EditorAndCodeReview,
     SettingsSection::CloudEnvironments,
@@ -178,6 +179,7 @@ fn all_sections_list_is_exhaustive() {
             | SettingsSection::AgentMCPServers
             | SettingsSection::Knowledge
             | SettingsSection::ThirdPartyCLIAgents
+            | SettingsSection::TaskAgents
             | SettingsSection::CodeIndexing
             | SettingsSection::EditorAndCodeReview
             | SettingsSection::CloudEnvironments

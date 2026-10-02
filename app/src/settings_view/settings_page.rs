@@ -46,6 +46,7 @@ use super::privacy_page::PrivacyPageView;
 use super::referrals_page::ReferralsPageView;
 use super::scripting_page::ScriptingSettingsPageView;
 use super::show_blocks_view::ShowBlocksView;
+use super::task_agents_page::TaskAgentsPageView;
 use super::teams_page::TeamsPageView;
 use super::warp_agent_page::WarpAgentPageView;
 use super::warp_drive_page::WarpDriveSettingsPageView;
@@ -130,6 +131,7 @@ pub enum SettingsPageViewHandle {
     BillingAndUsage(ViewHandle<BillingAndUsageDispatchView>),
     MCPServers(ViewHandle<MCPServersSettingsPageView>),
     WarpDrive(ViewHandle<WarpDriveSettingsPageView>),
+    TaskAgents(ViewHandle<TaskAgentsPageView>),
 }
 
 impl SettingsPageViewHandle {
@@ -158,6 +160,7 @@ impl SettingsPageViewHandle {
             BillingAndUsage(view_handle) => ChildView::new(view_handle).finish(),
             MCPServers(view_handle) => ChildView::new(view_handle).finish(),
             WarpDrive(view_handle) => ChildView::new(view_handle).finish(),
+            TaskAgents(view_handle) => ChildView::new(view_handle).finish(),
         }
     }
 }

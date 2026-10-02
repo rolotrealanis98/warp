@@ -26,6 +26,7 @@ use settings_page::{
     SettingsPageViewHandle,
 };
 use show_blocks_view::{ShowBlocksEvent, ShowBlocksView};
+use task_agents_page::TaskAgentsPageView;
 use teams_page::{TeamsPageAction, TeamsPageView, TeamsPageViewEvent};
 use warp_agent_page::{WarpAgentPageAction, WarpAgentPageEvent, WarpAgentPageView};
 use warp_core::channel::ChannelState;
@@ -117,6 +118,7 @@ mod settings_file_footer;
 pub(crate) mod settings_page;
 mod show_blocks_view;
 mod tab_menu;
+mod task_agents_page;
 mod teams_page;
 mod telemetry;
 mod transfer_ownership_confirmation_modal;
@@ -330,6 +332,7 @@ pub enum SettingsSection {
     AgentMCPServers,
     Knowledge,
     ThirdPartyCLIAgents,
+    TaskAgents,
     // ── Code umbrella subpages ──
     CodeIndexing,
     EditorAndCodeReview,
@@ -355,6 +358,7 @@ impl Display for SettingsSection {
             SettingsSection::AgentMCPServers => write!(f, "MCP servers"),
             SettingsSection::Knowledge => write!(f, "Knowledge"),
             SettingsSection::ThirdPartyCLIAgents => write!(f, "Third party CLI agents"),
+            SettingsSection::TaskAgents => write!(f, "Task agents"),
             SettingsSection::CodeIndexing => write!(f, "Indexing and projects"),
             SettingsSection::EditorAndCodeReview => write!(f, "Editor and Code Review"),
             SettingsSection::CloudEnvironments => write!(f, "Environments"),
@@ -398,6 +402,7 @@ impl SettingsSection {
             Self::AgentMCPServers => "MCP servers",
             Self::Knowledge => "Knowledge",
             Self::ThirdPartyCLIAgents => "Third party CLI agents",
+            Self::TaskAgents => "Task agents",
             Self::CodeIndexing => "Indexing and projects",
             Self::EditorAndCodeReview => "Editor and Code Review",
             Self::CloudEnvironments => "Environments",
@@ -437,6 +442,7 @@ impl SettingsSection {
             "MCP servers" | "MCP Servers" | "AgentMCPServers" => Self::AgentMCPServers,
             "Knowledge" => Self::Knowledge,
             "Third party CLI agents" | "ThirdPartyCLIAgents" => Self::ThirdPartyCLIAgents,
+            "Task agents" | "TaskAgents" => Self::TaskAgents,
             // "Code" named the combined page before it split in two.
             "Indexing and projects" | "CodeIndexing" | "Code" => Self::CodeIndexing,
             "Editor and Code Review" | "EditorAndCodeReview" => Self::EditorAndCodeReview,
@@ -1165,6 +1171,7 @@ macro_rules! update_page {
             SettingsPageViewHandle::BillingAndUsage(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::MCPServers(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::WarpDrive(handle) => $ctx.update_view(handle, $update),
+            SettingsPageViewHandle::TaskAgents(handle) => $ctx.update_view(handle, $update),
         }
     };
 }
@@ -1394,6 +1401,11 @@ impl SettingsView {
         if let Some(scripting_page_handle) = scripting_page_handle {
             settings_pages.push(SettingsPage::new(scripting_page_handle));
         }
+        if FeatureFlag::TaskAgentLauncher.is_enabled() {
+            settings_pages.push(SettingsPage::new(
+                ctx.add_typed_action_view(TaskAgentsPageView::new),
+            ));
+        }
 
         settings_pages.extend(vec![
             SettingsPage::new(mcp_servers_page_handle),
@@ -1404,18 +1416,19 @@ impl SettingsView {
 
         // Build sidebar nav items. Umbrellas group their subpages here and
         // nowhere else, so this list is the only place membership is declared.
+        let mut agent_subpages = vec![
+            SettingsSection::WarpAgent,
+            SettingsSection::AgentProfiles,
+            SettingsSection::AgentMCPServers,
+            SettingsSection::Knowledge,
+            SettingsSection::ThirdPartyCLIAgents,
+        ];
+        if FeatureFlag::TaskAgentLauncher.is_enabled() {
+            agent_subpages.push(SettingsSection::TaskAgents);
+        }
         let mut nav_items = vec![
             SettingsNavItem::Page(SettingsSection::Account),
-            SettingsNavItem::Umbrella(SettingsUmbrella::new(
-                "Agents",
-                vec![
-                    SettingsSection::WarpAgent,
-                    SettingsSection::AgentProfiles,
-                    SettingsSection::AgentMCPServers,
-                    SettingsSection::Knowledge,
-                    SettingsSection::ThirdPartyCLIAgents,
-                ],
-            )),
+            SettingsNavItem::Umbrella(SettingsUmbrella::new("Agents", agent_subpages)),
             SettingsNavItem::Page(SettingsSection::BillingAndUsage),
             SettingsNavItem::Umbrella(SettingsUmbrella::new(
                 "Code",
@@ -2134,6 +2147,7 @@ impl SettingsView {
             SettingsPageViewHandle::CodeIndexing(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::EditorAndCodeReview(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::WarpDrive(v) => v.as_ref(app).should_render(app),
+            SettingsPageViewHandle::TaskAgents(v) => v.as_ref(app).should_render(app),
         }
     }
 
