@@ -110,6 +110,7 @@ pub fn initialize_settings_for_tests_with_mode(
     SessionSettings::register(app);
     crate::task_agent::settings::TaskAgentSettings::register(app);
     crate::pr_agent::settings::PrAgentSettings::register(app);
+    crate::pr_stack::PrStackSettings::register(app);
     SshSettings::register(app);
     TabSettings::register(app);
     TerminalSettings::register(app);
