@@ -121,6 +121,7 @@ pub fn initialize_settings_for_tests_with_mode(
     WindowSettings::register(app);
     SharedSessionSettings::register(app);
     CodeSettings::register(app);
+    crate::ai::cli_chat::CliChatViewSettings::register(app);
     SemanticSelection::register(app);
 
     app.update(|ctx| {

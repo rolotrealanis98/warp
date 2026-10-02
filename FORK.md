@@ -18,6 +18,25 @@ Cargo feature `fork_features` turns them all on and is part of `default`.
 | `PrReviewAgent`     | `pr_review_agent`     | Check out a PR, launch an agent with a user-supplied review prompt, watch the PR for commits / reviews / checks. |
 | `PrStackView`       | `pr_stack_view`       | Left-panel ledger of a branch stack: stack-relative diffs with line classification, create PR for the next branch, restack after merges. |
 
+### CLI agent chat view
+
+While Claude Code runs in a pane, switch that pane to a chat rendering with
+`Cmd/Ctrl-Shift-L`, the **Chat** button in the CLI agent footer, or the pane
+header menu. The chat is read from Claude Code's own session transcript
+(`~/.claude/projects/...`, or `$CLAUDE_CONFIG_DIR`); the composer and the key
+strip write to the same PTY, so the session keeps running unchanged. The
+**Terminal** button (or the same shortcut) switches back. The transcript path
+is found most reliably with the Warp plugin for Claude Code installed.
+
+Settings (Settings > Third party CLI agents, or `settings.toml`):
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `cli_chat_view.open_on_session_start` | `false` | Switch to the chat view when a Claude Code session starts. |
+| `cli_chat_view.collapse_thinking` | `true` | Thinking blocks start collapsed. |
+| `cli_chat_view.collapse_tool_output` | `true` | Successful tool calls start collapsed. |
+| `cli_chat_view.show_timestamps` | `false` | Show message times. |
+
 Build without the fork features:
 
 ```sh

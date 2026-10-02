@@ -22,6 +22,7 @@ use super::{
     TuiAutoupdateSettings, TuiThemeSettings, TuiVoiceSettings, TuiZeroStateSettings,
     VimBannerSettings, WarpDrivePrivacySettings,
 };
+use crate::ai::cli_chat::CliChatViewSettings;
 use crate::ai::cloud_agent_settings::CloudAgentSettings;
 use crate::appearance;
 use crate::banner::BannerState;
@@ -76,6 +77,7 @@ pub fn register_all_settings(ctx: &mut AppContext) {
     GeneralSettings::register(ctx);
     AISettings::register_and_subscribe_to_events(ctx);
     CloudAgentSettings::register(ctx);
+    CliChatViewSettings::register(ctx);
     ScrollSettings::register(ctx);
     SelectionSettings::register(ctx);
     InputModeSettings::register(ctx);

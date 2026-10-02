@@ -6,6 +6,7 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::marker::PhantomData;
 
 use enum_iterator::all;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
@@ -37,6 +38,10 @@ use super::settings_page::{
 use super::{SettingsAction, SettingsSection, ToggleSettingActionPair, flags};
 use crate::ai::blocklist::agent_view::agent_input_footer::editor::{
     AgentToolbarEditorMode, AgentToolbarInlineEditor,
+};
+use crate::ai::cli_chat::{
+    CliChatViewCollapseThinking, CliChatViewCollapseToolOutput, CliChatViewSettings,
+    CliChatViewShowTimestamps, CliChatViewToggle, OpenCliChatViewOnSessionStart,
 };
 use crate::appearance::Appearance;
 use crate::menu::{MenuItem, MenuItemFields};
@@ -113,6 +118,7 @@ impl CLIAgentsPageView {
             }
             ctx.notify();
         });
+        ctx.subscribe_to_model(&CliChatViewSettings::handle(ctx), |_, _, _, ctx| ctx.notify());
 
         Self {
             page: Self::build_page(),
@@ -125,7 +131,7 @@ impl CLIAgentsPageView {
     }
 
     fn build_page() -> PageType<Self> {
-        let widgets: Vec<Box<dyn SettingsWidget<View = Self>>> = vec![
+        let mut widgets: Vec<Box<dyn SettingsWidget<View = Self>>> = vec![
             Box::new(CLIAgentWidget::default()),
             Box::new(CLIAgentAutoToggleRichInputWidget::default()),
             Box::new(CLIAgentAutoOpenRichInputWidget::default()),
@@ -134,6 +140,9 @@ impl CLIAgentsPageView {
             Box::new(CLIAgentCommandsWidget),
             Box::new(CLIAgentToolbarLayoutWidget),
         ];
+        if FeatureFlag::CliAgentChatView.is_enabled() {
+            widgets.extend(cli_chat_view_widgets());
+        }
         PageType::new_uncategorized(widgets, Some(PageTitle::new(PAGE_TITLE)))
     }
 
@@ -243,6 +252,7 @@ pub enum CLIAgentsPageAction {
         pattern: String,
         agent: Option<CLIAgent>,
     },
+    ToggleCliChatViewSetting(CliChatViewToggle),
 }
 
 impl TypedActionView for CLIAgentsPageView {
@@ -310,6 +320,11 @@ impl TypedActionView for CLIAgentsPageView {
             CLIAgentsPageAction::SetCLIAgentForCommand { pattern, agent } => {
                 AISettings::handle(ctx).update(ctx, |settings, ctx| {
                     settings.set_cli_agent_for_command(pattern, *agent, ctx);
+                });
+            }
+            CLIAgentsPageAction::ToggleCliChatViewSetting(toggle) => {
+                CliChatViewSettings::handle(ctx).update(ctx, |settings, ctx| {
+                    settings.toggle(*toggle, ctx);
                 });
             }
         }
@@ -813,5 +828,76 @@ impl SettingsWidget for CLIAgentToolbarLayoutWidget {
         }
 
         render_toolbar_layout_editor(&view.cli_agent_toolbar_inline_editor, appearance)
+    }
+}
+
+/// Rows for the CLI agent chat view (fork feature `CliAgentChatView`).
+fn cli_chat_view_widgets() -> Vec<Box<dyn SettingsWidget<View = CLIAgentsPageView>>> {
+    vec![
+        Box::new(CliChatViewToggleWidget::<OpenCliChatViewOnSessionStart>::new(
+            "Open the chat view when a Claude Code session starts",
+            "third party cli coding agent claude chat view open session start default",
+            CliChatViewToggle::OpenOnSessionStart,
+        )),
+        Box::new(CliChatViewToggleWidget::<CliChatViewCollapseThinking>::new(
+            "Collapse thinking in the chat view",
+            "third party cli coding agent claude chat view collapse thinking",
+            CliChatViewToggle::CollapseThinking,
+        )),
+        Box::new(CliChatViewToggleWidget::<CliChatViewCollapseToolOutput>::new(
+            "Collapse tool output in the chat view",
+            "third party cli coding agent claude chat view collapse tool output calls",
+            CliChatViewToggle::CollapseToolOutput,
+        )),
+        Box::new(CliChatViewToggleWidget::<CliChatViewShowTimestamps>::new(
+            "Show timestamps in the chat view",
+            "third party cli coding agent claude chat view timestamps time",
+            CliChatViewToggle::ShowTimestamps,
+        )),
+    ]
+}
+
+struct CliChatViewToggleWidget<S> {
+    label: &'static str,
+    search_terms: &'static str,
+    toggle: CliChatViewToggle,
+    switch: SwitchStateHandle,
+    setting: PhantomData<S>,
+}
+
+impl<S> CliChatViewToggleWidget<S> {
+    fn new(label: &'static str, search_terms: &'static str, toggle: CliChatViewToggle) -> Self {
+        Self {
+            label,
+            search_terms,
+            toggle,
+            switch: Default::default(),
+            setting: PhantomData,
+        }
+    }
+}
+
+impl<S: Setting> SettingsWidget for CliChatViewToggleWidget<S> {
+    type View = CLIAgentsPageView;
+
+    fn search_terms(&self) -> &str {
+        self.search_terms
+    }
+
+    fn render(
+        &self,
+        view: &Self::View,
+        _appearance: &Appearance,
+        app: &AppContext,
+    ) -> Box<dyn Element> {
+        render_ai_setting_toggle::<S>(
+            self.label,
+            CLIAgentsPageAction::ToggleCliChatViewSetting(self.toggle),
+            self.toggle.value(app),
+            true,
+            self.switch.clone(),
+            &view.local_only_icon_tooltip_states,
+            app,
+        )
     }
 }
