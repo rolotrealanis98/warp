@@ -1204,9 +1204,44 @@ fn register_input_mode_bindings(app: &mut AppContext) {
                 linux_and_windows: "ctrl-shift-enter",
             },
             TerminalAction::SetInputModeAgent,
-            agent_conversation_predicate & agent_mode_predicate.clone() & command_predicate,
+            agent_conversation_predicate & agent_mode_predicate.clone() & command_predicate.clone(),
         )
         .with_enabled(|| FeatureFlag::AgentView.is_enabled()),
+    ]);
+
+    // Fork: without Warp AI the agent keystroke drives Claude Code instead: it starts Claude
+    // Code in an idle pane, shows the chat view of a running CLI agent, and asks Claude Code
+    // about any other running command.
+    let cli_agent_predicate = id!("Terminal")
+        & !id!("Input")
+        & !id!("SubshellBanner")
+        & !id!(flags::IS_ANY_AI_ENABLED)
+        & !id!(flags::HAS_PENDING_PROMPT_SUGGESTION);
+    let agent_keystroke = || PerPlatformKeystroke {
+        mac: "cmd-enter",
+        linux_and_windows: "ctrl-shift-enter",
+    };
+    app.register_fixed_bindings([
+        FixedBinding::new_per_platform(
+            agent_keystroke(),
+            TerminalAction::StartNewAgentConversation {
+                origin: AgentViewEntryOrigin::Keybinding(
+                    ENTER_AGENT_VIEW_NEW_CONVERSATION_KEYSTROKE.clone(),
+                ),
+            },
+            cli_agent_predicate.clone() & !command_predicate.clone(),
+        )
+        .with_enabled(|| FeatureFlag::AgentView.is_enabled()),
+        FixedBinding::new_per_platform(
+            agent_keystroke(),
+            TerminalAction::ToggleCliChatView,
+            cli_agent_predicate.clone() & id!(CLI_CHAT_VIEW_AVAILABLE_KEY),
+        ),
+        FixedBinding::new_per_platform(
+            agent_keystroke(),
+            TerminalAction::SetInputModeAgent,
+            cli_agent_predicate & command_predicate & !id!(CLI_AGENT_SESSION_ACTIVE_KEY),
+        ),
     ]);
 
     app.register_editable_bindings([

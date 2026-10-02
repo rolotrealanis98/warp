@@ -331,8 +331,9 @@ impl TerminalView {
             return true;
         }
 
-        // All other footer variants require the global AI setting to be on.
-        if !ai_settings.is_any_ai_enabled(app) {
+        // Fork: the user-command variant asks Claude Code, so only the variant that hands a
+        // command back to Warp's agent needs Warp AI.
+        if active_block.is_eligible_for_agent_handoff() && !ai_settings.is_any_ai_enabled(app) {
             return false;
         }
 
@@ -1117,7 +1118,8 @@ impl TerminalView {
 
 /// Footer rendered at the bottom of the active long running block or alt screen element.
 ///
-/// For regular commands, displays a 'Use agent' keystroke button to enter agent mode.
+/// For regular commands, displays an 'Ask Claude Code' keystroke button that starts Claude Code
+/// on the running command.
 /// For CLI agent commands (e.g., Claude Code, Gemini CLI, Codex), displays a specialized
 /// footer with image attachment, voice input, file explorer, view changes, and share buttons.
 pub struct UseAgentToolbar {
@@ -1155,13 +1157,13 @@ impl UseAgentToolbar {
 
         let button = ctx.add_typed_action_view(|ctx| {
             ActionButton::new(
-                "Use agent",
+                "Ask Claude Code",
                 AgentFooterButtonTheme::new(Some(terminal_model.clone())),
             )
             .with_icon(Icon::Agent)
             .with_keybinding(KeystrokeSource::Fixed(USE_AGENT_KEYSTROKE.clone()), ctx)
             .with_size(button_size)
-            .with_tooltip("Ask the Warp agent to assist")
+            .with_tooltip("Start Claude Code with this command and its output")
             .with_tooltip_alignment(TooltipAlignment::Left)
             .on_click(|ctx| {
                 ctx.dispatch_typed_action(TerminalAction::SetInputModeAgent);

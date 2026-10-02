@@ -5,6 +5,7 @@ mod block_banner;
 pub mod block_onboarding;
 pub(crate) mod blocklist_filter;
 mod bookmarks;
+mod cli_agent_launch;
 mod cli_chat;
 mod context_menu;
 pub mod init;
@@ -22476,6 +22477,10 @@ impl TerminalView {
                         ctx,
                     );
                 }
+                // Fork: without Warp AI, a new agent conversation is a CLI agent session.
+                None if !AISettings::as_ref(ctx).is_any_ai_enabled(ctx) => {
+                    self.start_or_show_cli_agent(initial_prompt.clone(), ctx);
+                }
                 None => {
                     self.enter_agent_view_for_new_conversation(
                         initial_prompt.clone(),
@@ -22484,6 +22489,7 @@ impl TerminalView {
                     );
                 }
             },
+            InputEvent::StartClaudeCode { prompt } => self.start_claude_code(prompt.clone(), ctx),
             InputEvent::EnterCloudAgentView { initial_prompt } => {
                 self.enter_cloud_agent_view(initial_prompt.clone(), ctx);
             }
@@ -28005,6 +28011,11 @@ impl TypedActionView for TerminalView {
                     .active_block()
                     .is_eligible_to_tag_in_agent()
                 {
+                    if !AISettings::as_ref(ctx).is_any_ai_enabled(ctx) {
+                        // Fork: without Warp AI, "Ask Claude Code" about the command instead.
+                        self.ask_claude_code_about_active_block(ctx);
+                        return;
+                    }
                     if FeatureFlag::AgentView.is_enabled() {
                         self.agent_view_controller.update(ctx, |controller, ctx| {
                             if !controller.is_inline()

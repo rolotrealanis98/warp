@@ -1150,6 +1150,10 @@ pub enum Event {
     EnterCloudAgentView {
         initial_prompt: Option<String>,
     },
+    /// Fork: start Claude Code in this pane with `prompt` (empty for none) as its first message.
+    StartClaudeCode {
+        prompt: String,
+    },
     CreateDockerSandbox,
     /// Exit cloud mode (ambient agent) and start a new *local* agent conversation in the root terminal.
     ///
