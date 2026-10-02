@@ -79,6 +79,52 @@ setup_commands = ["npm ci"]
 default_cli = "codex"
 ```
 
+### PR review agent
+
+Requires the [GitHub CLI](https://cli.github.com) (`gh`), logged in. Command
+palette: **PR agent: review pull request…**, from a terminal inside a clone of
+the repository. The form takes a pull request URL or `owner/repo#123` (github.com
+only), looks it up with `gh`, and offers:
+
+- where the agent works: a new worktree (default), a new branch in the current
+  checkout, or the current checkout. The first two create a `review/PR-<n>-…`
+  branch from the pull request's base through the task agent launcher and reset
+  it to the pull request's head with `gh pr checkout <n> -b <branch> --force`
+  (the branch is never pushed); the third runs `gh pr checkout <n>` in place;
+- the agent CLI;
+- the prompt: "Review someone else's PR" or "Watch my own PR" (picked
+  automatically by comparing the author with `gh api user`), rendered from the
+  templates below into an editable preview.
+
+The tab is titled `PR #<n> <title>`, the task key is `PR-<n>`. While the pane is
+open, Warp polls `gh pr view` and the pull request's line comments every
+`poll_interval_secs` and turns differences into events: new commits, new review
+comments (path and line), new reviews (state and body), checks finished passing
+or failing. Comments and reviews by the `gh` user are skipped, since the agent
+posts as that user. With `auto_forward_events` on, the events are sent to the
+agent as one message once it is idle (its turn ended and the rich input is
+closed); what the agent does with them is up to the prompt. Idle detection needs
+the Warp plugin for the agent. The pane header shows chips for checks, review
+decision and unread updates (also above the chat view); clicking them opens the
+pull request.
+
+When the agent's turn ends, review comments it posted with `gh` (authored by
+the `gh` user) are copied into the Code Review panel for the checkout.
+
+Settings (Settings > Agents > PR agent, or `pr_agent.*` in `settings.toml`):
+
+| Key | Default |
+|-----|---------|
+| `poll_interval_secs` | `90` (minimum 15) |
+| `auto_forward_events` | `true` |
+| `review_other_template` | generic: what the PR is, where it is checked out, read updates but do not act on them unless asked |
+| `watch_own_template` | generic: same, plus summarize review feedback without changing code or replying |
+| `default_checkout` | `worktree` (`branch`, `here`) |
+
+Template variables: `{{number}}`, `{{title}}`, `{{url}}`, `{{author}}`,
+`{{base}}`, `{{repo}}` (`owner/repo`), `{{checkout_path}}`, `{{branch}}`.
+Replace the templates locally with your own review instructions.
+
 Build without the fork features:
 
 ```sh

@@ -17,6 +17,7 @@ use main_page::{MainPageAction, MainSettingsPageEvent, MainSettingsPageView};
 use mcp_servers_page::MCPServersSettingsPageView;
 use nav::{SettingsNavItem, SettingsUmbrella};
 use pathfinder_geometry::vector::Vector2F;
+use pr_agent_page::PrAgentPageView;
 use pr_stack_page::PrStackPageView;
 use privacy_page::{PrivacyPageView, PrivacyPageViewEvent};
 use referrals_page::{ReferralsPageEvent, ReferralsPageView};
@@ -109,6 +110,7 @@ mod nav;
 pub mod pane_manager;
 mod platform;
 mod platform_page;
+mod pr_agent_page;
 mod pr_stack_page;
 mod privacy;
 mod privacy_page;
@@ -335,6 +337,7 @@ pub enum SettingsSection {
     Knowledge,
     ThirdPartyCLIAgents,
     TaskAgents,
+    PrAgent,
     // ── Code umbrella subpages ──
     CodeIndexing,
     EditorAndCodeReview,
@@ -363,6 +366,7 @@ impl Display for SettingsSection {
             SettingsSection::Knowledge => write!(f, "Knowledge"),
             SettingsSection::ThirdPartyCLIAgents => write!(f, "Third party CLI agents"),
             SettingsSection::TaskAgents => write!(f, "Task agents"),
+            SettingsSection::PrAgent => write!(f, "PR agent"),
             SettingsSection::CodeIndexing => write!(f, "Indexing and projects"),
             SettingsSection::EditorAndCodeReview => write!(f, "Editor and Code Review"),
             SettingsSection::CloudEnvironments => write!(f, "Environments"),
@@ -408,6 +412,7 @@ impl SettingsSection {
             Self::Knowledge => "Knowledge",
             Self::ThirdPartyCLIAgents => "Third party CLI agents",
             Self::TaskAgents => "Task agents",
+            Self::PrAgent => "PR agent",
             Self::CodeIndexing => "Indexing and projects",
             Self::EditorAndCodeReview => "Editor and Code Review",
             Self::CloudEnvironments => "Environments",
@@ -449,6 +454,7 @@ impl SettingsSection {
             "Knowledge" => Self::Knowledge,
             "Third party CLI agents" | "ThirdPartyCLIAgents" => Self::ThirdPartyCLIAgents,
             "Task agents" | "TaskAgents" => Self::TaskAgents,
+            "PR agent" | "PrAgent" => Self::PrAgent,
             // "Code" named the combined page before it split in two.
             "Indexing and projects" | "CodeIndexing" | "Code" => Self::CodeIndexing,
             "Editor and Code Review" | "EditorAndCodeReview" => Self::EditorAndCodeReview,
@@ -1180,6 +1186,7 @@ macro_rules! update_page {
             SettingsPageViewHandle::WarpDrive(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::TaskAgents(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::PrStack(handle) => $ctx.update_view(handle, $update),
+            SettingsPageViewHandle::PrAgent(handle) => $ctx.update_view(handle, $update),
         }
     };
 }
@@ -1421,6 +1428,11 @@ impl SettingsView {
         if let Some(pr_stack_page_handle) = pr_stack_page_handle {
             settings_pages.push(SettingsPage::new(pr_stack_page_handle));
         }
+        if FeatureFlag::PrReviewAgent.is_enabled() {
+            settings_pages.push(SettingsPage::new(
+                ctx.add_typed_action_view(PrAgentPageView::new),
+            ));
+        }
 
         settings_pages.extend(vec![
             SettingsPage::new(mcp_servers_page_handle),
@@ -1440,6 +1452,9 @@ impl SettingsView {
         ];
         if FeatureFlag::TaskAgentLauncher.is_enabled() {
             agent_subpages.push(SettingsSection::TaskAgents);
+        }
+        if FeatureFlag::PrReviewAgent.is_enabled() {
+            agent_subpages.push(SettingsSection::PrAgent);
         }
         let mut nav_items = vec![
             SettingsNavItem::Page(SettingsSection::Account),
@@ -2178,6 +2193,7 @@ impl SettingsView {
             SettingsPageViewHandle::WarpDrive(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::TaskAgents(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::PrStack(v) => v.as_ref(app).should_render(app),
+            SettingsPageViewHandle::PrAgent(v) => v.as_ref(app).should_render(app),
         }
     }
 

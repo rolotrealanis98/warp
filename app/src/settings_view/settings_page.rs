@@ -42,6 +42,7 @@ use super::keybindings::KeybindingsView;
 use super::knowledge_page::KnowledgePageView;
 use super::main_page::MainSettingsPageView;
 use super::mcp_servers_page::MCPServersSettingsPageView;
+use super::pr_agent_page::PrAgentPageView;
 use super::pr_stack_page::PrStackPageView;
 use super::privacy_page::PrivacyPageView;
 use super::referrals_page::ReferralsPageView;
@@ -134,6 +135,7 @@ pub enum SettingsPageViewHandle {
     WarpDrive(ViewHandle<WarpDriveSettingsPageView>),
     TaskAgents(ViewHandle<TaskAgentsPageView>),
     PrStack(ViewHandle<PrStackPageView>),
+    PrAgent(ViewHandle<PrAgentPageView>),
 }
 
 impl SettingsPageViewHandle {
@@ -164,6 +166,7 @@ impl SettingsPageViewHandle {
             WarpDrive(view_handle) => ChildView::new(view_handle).finish(),
             TaskAgents(view_handle) => ChildView::new(view_handle).finish(),
             PrStack(view_handle) => ChildView::new(view_handle).finish(),
+            PrAgent(view_handle) => ChildView::new(view_handle).finish(),
         }
     }
 }
