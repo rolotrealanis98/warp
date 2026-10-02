@@ -838,7 +838,7 @@ fn cli_chat_view_widgets() -> Vec<Box<dyn SettingsWidget<View = CLIAgentsPageVie
     vec![
         Box::new(
             CliChatViewToggleWidget::<OpenCliChatViewOnSessionStart>::new(
-                "Open the chat view when a Claude Code session starts",
+                "Open the chat view when a CLI agent session starts",
                 "third party cli coding agent claude chat view open session start default",
                 CliChatViewToggle::OpenOnSessionStart,
             ),

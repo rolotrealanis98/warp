@@ -40,7 +40,7 @@ fn toggle(app: &mut App, terminal: &ViewHandle<TerminalView>) -> bool {
 }
 
 #[test]
-fn toggle_is_a_no_op_without_a_claude_session() {
+fn toggle_is_a_no_op_without_a_supported_session() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
         let _flag = FeatureFlag::CliAgentChatView.override_enabled(true);
@@ -48,11 +48,26 @@ fn toggle_is_a_no_op_without_a_claude_session() {
         let view_id = terminal.read(&app, |view, _| view.view_id);
 
         let without_session = toggle(&mut app, &terminal);
-        start_session(&mut app, view_id, CLIAgent::Codex);
+        start_session(&mut app, view_id, CLIAgent::Gemini);
         let with_other_agent = toggle(&mut app, &terminal);
 
         assert!(!without_session);
         assert!(!with_other_agent);
+    })
+}
+
+#[test]
+fn toggle_opens_chat_for_a_command_detected_copilot_session() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let _flag = FeatureFlag::CliAgentChatView.override_enabled(true);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let view_id = terminal.read(&app, |view, _| view.view_id);
+        start_session(&mut app, view_id, CLIAgent::Copilot);
+
+        let shown = toggle(&mut app, &terminal);
+
+        assert!(shown);
     })
 }
 

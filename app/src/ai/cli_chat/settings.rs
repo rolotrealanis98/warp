@@ -12,7 +12,7 @@ define_settings_group!(CliChatViewSettings, settings: [
         surface: settings::SettingSurfaces::GUI,
         private: false,
         toml_path: "cli_chat_view.open_on_session_start",
-        description: "Whether a pane switches to the chat view when a Claude Code session starts.",
+        description: "Whether a pane switches to the chat view when a supported CLI agent session starts.",
     },
     collapse_thinking: CliChatViewCollapseThinking {
         type: bool,

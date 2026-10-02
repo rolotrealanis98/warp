@@ -32,6 +32,10 @@ pub(crate) enum ChatItem {
     Notice {
         text: String,
     },
+    /// Waiting on the user (e.g. a permission prompt); never collapsed.
+    Attention {
+        text: String,
+    },
     Assistant {
         text: String,
         markdown: Option<Arc<FormattedText>>,
@@ -89,13 +93,18 @@ impl ToolKind {
 }
 
 impl ToolItem {
+    /// Claude Code tool names first, then Codex (`exec`, `exec_command`,
+    /// `shell`, `apply_patch`) and Copilot CLI (`bash`, `view`, `edit`, ...).
     pub(crate) fn kind(&self) -> ToolKind {
         match self.name.as_str() {
-            "Read" | "NotebookRead" | "LS" => ToolKind::Read,
-            "Edit" | "MultiEdit" | "Write" | "NotebookEdit" => ToolKind::Edit,
-            "Bash" | "BashOutput" | "KillShell" | "PowerShell" => ToolKind::Command,
-            "Grep" | "Glob" | "ToolSearch" => ToolKind::Search,
-            "WebFetch" | "WebSearch" => ToolKind::Web,
+            "Read" | "NotebookRead" | "LS" | "view" => ToolKind::Read,
+            "Edit" | "MultiEdit" | "Write" | "NotebookEdit" | "apply_patch" | "edit" | "create" => {
+                ToolKind::Edit
+            }
+            "Bash" | "BashOutput" | "KillShell" | "PowerShell" | "exec" | "exec_command"
+            | "shell" | "bash" => ToolKind::Command,
+            "Grep" | "Glob" | "ToolSearch" | "rg" | "grep" | "glob" => ToolKind::Search,
+            "WebFetch" | "WebSearch" | "web_fetch" => ToolKind::Web,
             "Agent" | "Task" => ToolKind::Subagent,
             name if name.starts_with("mcp__") => ToolKind::Mcp,
             _ => ToolKind::Other,
@@ -117,6 +126,7 @@ impl ToolItem {
             .then(|| {
                 self.input_str("file_path")
                     .or(self.input_str("notebook_path"))
+                    .or(self.input_str("path"))
             })
             .flatten()
     }
@@ -124,11 +134,14 @@ impl ToolItem {
     /// A one-line description of the call's input for the card header.
     pub(crate) fn summary(&self) -> String {
         let text = match self.name.as_str() {
-            "Bash" | "PowerShell" => self.input_str("command"),
-            "Read" | "Edit" | "MultiEdit" | "Write" => self.input_str("file_path"),
+            "Bash" | "PowerShell" | "exec" | "exec_command" | "shell" | "bash" => {
+                self.input_str("command")
+            }
+            "Read" | "Edit" | "MultiEdit" | "Write" | "apply_patch" => self.input_str("file_path"),
+            "view" | "edit" | "create" => self.input_str("path"),
             "NotebookEdit" => self.input_str("notebook_path"),
-            "Grep" | "Glob" => self.input_str("pattern"),
-            "WebFetch" => self.input_str("url"),
+            "Grep" | "Glob" | "rg" | "grep" | "glob" => self.input_str("pattern"),
+            "WebFetch" | "web_fetch" => self.input_str("url"),
             "WebSearch" => self.input_str("query"),
             "Agent" | "Task" => self.input_str("description"),
             "TodoWrite" => {
@@ -279,6 +292,7 @@ impl Thread {
             match event {
                 ChatEvent::UserMessage { text, at } => self.items.push(ChatItem::User { text, at }),
                 ChatEvent::Notice { text } => self.items.push(ChatItem::Notice { text }),
+                ChatEvent::Attention { text } => self.items.push(ChatItem::Attention { text }),
                 ChatEvent::AssistantText { text, at } => {
                     // ponytail: markdown is parsed on the main thread at ingest; move it
                     // into the background read if very long sessions stall on open.
@@ -391,6 +405,9 @@ pub(crate) struct CliChatModel {
     /// The pane's working directory when the view opened; used to find the
     /// transcript when the agent did not report its own cwd.
     pane_cwd: Option<String>,
+    /// When the agent command started. Agents found by cwd only accept
+    /// transcripts written since then.
+    opened_after: DateTime<Utc>,
     path: Option<PathBuf>,
     source: Option<Box<dyn CliTranscriptSource>>,
     read_in_flight: bool,
@@ -408,11 +425,13 @@ impl CliChatModel {
     pub(crate) fn new(
         terminal_view_id: EntityId,
         pane_cwd: Option<String>,
+        opened_after: DateTime<Utc>,
         ctx: &mut ModelContext<Self>,
     ) -> Self {
         let mut model = Self {
             terminal_view_id,
             pane_cwd,
+            opened_after,
             path: None,
             source: None,
             read_in_flight: false,
@@ -475,6 +494,7 @@ impl CliChatModel {
         let transcript_path = context.transcript_path.clone();
         let session_id = context.session_id.clone();
         let cwd = context.cwd.clone().or_else(|| self.pane_cwd.clone());
+        let opened_after = self.opened_after;
 
         let current_path = self.path.clone();
         let mut source = self.source.take();
@@ -492,6 +512,7 @@ impl CliChatModel {
                     transcript_path.as_deref(),
                     session_id.as_deref(),
                     cwd.as_deref(),
+                    opened_after,
                 );
                 let reset = located.is_some() && located != current_path;
                 let path = if reset { located } else { current_path };

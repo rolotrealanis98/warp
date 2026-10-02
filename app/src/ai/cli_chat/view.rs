@@ -179,9 +179,11 @@ impl CliChatView {
         terminal_view_id: EntityId,
         agent: CLIAgent,
         pane_cwd: Option<String>,
+        opened_after: DateTime<Utc>,
         ctx: &mut ViewContext<Self>,
     ) -> Self {
-        let model = ctx.add_model(|ctx| CliChatModel::new(terminal_view_id, pane_cwd, ctx));
+        let model =
+            ctx.add_model(|ctx| CliChatModel::new(terminal_view_id, pane_cwd, opened_after, ctx));
         ctx.subscribe_to_model(&model, |me, _, event, ctx| match event {
             CliChatModelEvent::Updated => {
                 me.follow_tail();
@@ -366,7 +368,15 @@ impl CliChatView {
     /// The live status of the running turn, or `None` when the agent is idle.
     fn active_status(&self, app: &AppContext) -> Option<ActiveStatus> {
         let session = CLIAgentSessionsModel::as_ref(app).session(self.terminal_view_id)?;
-        let turn = self.model.as_ref(app).thread().active_turn();
+        let thread = self.model.as_ref(app).thread();
+        // A transcript-logged prompt (Copilot permission request) is pending
+        // until another item follows it.
+        if let Some(ChatItem::Attention { text }) = thread.items.last() {
+            return Some(ActiveStatus::Blocked(
+                text.lines().next().map(str::to_owned),
+            ));
+        }
+        let turn = thread.active_turn();
         if session.supports_rich_status() {
             match &session.status {
                 CLIAgentSessionStatus::Blocked { message } => {
@@ -475,6 +485,11 @@ fn tool_diff(tool: &ToolItem) -> Option<Vec<(ChangeTag, String)>> {
             .map(|edit| (str_field(edit, "old_string"), str_field(edit, "new_string")))
             .collect(),
         "Write" => vec![(String::new(), str_field(input, "content"))],
+        // Copilot CLI.
+        "edit" => vec![(str_field(input, "old_str"), str_field(input, "new_str"))],
+        "create" => vec![(String::new(), str_field(input, "file_text"))],
+        // Codex: already a diff.
+        "apply_patch" => return Some(patch_lines(input.get("patch")?.as_str()?)),
         _ => return None,
     };
     let mut lines = Vec::new();
@@ -494,6 +509,23 @@ fn tool_diff(tool: &ToolItem) -> Option<Vec<(ChangeTag, String)>> {
         );
     }
     Some(lines)
+}
+
+/// Lines of a Codex `apply_patch` body; file headers stay as context lines.
+fn patch_lines(patch: &str) -> Vec<(ChangeTag, String)> {
+    patch
+        .lines()
+        .filter(|line| !matches!(*line, "*** Begin Patch" | "*** End Patch"))
+        .map(|line| match line.split_at_checked(1) {
+            Some(("+", rest)) => (ChangeTag::Insert, rest.to_owned()),
+            Some(("-", rest)) => (ChangeTag::Delete, rest.to_owned()),
+            Some((" ", rest)) => (ChangeTag::Equal, rest.to_owned()),
+            _ => (
+                ChangeTag::Equal,
+                line.strip_prefix("*** ").unwrap_or(line).to_owned(),
+            ),
+        })
+        .collect()
 }
 
 /// Shared values for one render pass.
@@ -734,6 +766,14 @@ impl CliChatView {
                 }
                 palette.mono(shown, palette.sub).finish()
             }
+            ChatItem::Attention { text } => Flex::row()
+                .with_spacing(6.)
+                .with_child(palette.icon(Icon::AlertTriangle, palette.warning, 14.))
+                .with_child(
+                    Shrinkable::new(1., palette.text(text.clone(), palette.warning).finish())
+                        .finish(),
+                )
+                .finish(),
             ChatItem::Assistant { text, markdown, at } => {
                 let body = match markdown {
                     Some(markdown) => FormattedTextElement::new_arc(

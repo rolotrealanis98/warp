@@ -26,6 +26,10 @@ pub(crate) enum ChatEvent {
     Notice {
         text: String,
     },
+    /// The agent is waiting on the user, e.g. a permission prompt.
+    Attention {
+        text: String,
+    },
     AssistantText {
         text: String,
         at: Option<DateTime<Utc>>,

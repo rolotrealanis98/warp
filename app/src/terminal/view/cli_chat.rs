@@ -2,6 +2,7 @@
 //! rendering of the CLI agent running in it (see `crate::ai::cli_chat`).
 //! Only the rendering changes; the PTY and the agent process are untouched.
 
+use chrono::Utc;
 use warpui::{AppContext, SingletonEntity, ViewContext};
 
 use super::TerminalView;
@@ -40,8 +41,18 @@ impl TerminalView {
         };
         let terminal_view_id = self.view_id;
         let pane_cwd = self.pwd();
-        let chat_view = ctx
-            .add_typed_action_view(|ctx| CliChatView::new(terminal_view_id, agent, pane_cwd, ctx));
+        // The agent command's start: agents found by cwd only match transcripts
+        // written since then, which excludes earlier sessions in the same cwd.
+        let opened_after = self
+            .model
+            .lock()
+            .block_list()
+            .active_block()
+            .start_ts()
+            .map_or_else(Utc::now, |start| start.with_timezone(&Utc));
+        let chat_view = ctx.add_typed_action_view(|ctx| {
+            CliChatView::new(terminal_view_id, agent, pane_cwd, opened_after, ctx)
+        });
         ctx.subscribe_to_view(&chat_view, |me, _, event, ctx| {
             me.handle_cli_chat_view_event(event, ctx);
         });

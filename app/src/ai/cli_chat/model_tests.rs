@@ -109,6 +109,60 @@ fn subagent_calls_are_never_grouped() {
 }
 
 #[test]
+fn attention_items_split_tool_groups_and_stay_their_own_row() {
+    let thread = thread(vec![
+        call("t1", "bash", json!({"command": "cargo test"})),
+        result("t1", false),
+        ChatEvent::Attention {
+            text: "Permission: Run tests".to_owned(),
+        },
+        call("t2", "view", json!({"path": "/work/octo/repo/README.md"})),
+        result("t2", false),
+    ]);
+
+    assert_eq!(
+        rows(&thread.items),
+        vec![Row::Item(0), Row::Item(1), Row::Item(2)]
+    );
+}
+
+#[test]
+fn codex_and_copilot_tool_names_map_to_card_kinds() {
+    let thread = thread(vec![
+        call("t1", "exec_command", json!({"command": "ls"})),
+        call("t2", "apply_patch", json!({"file_path": "src/lib.rs"})),
+        call("t3", "bash", json!({"command": "ls"})),
+        call("t4", "view", json!({"path": "README.md"})),
+        call("t5", "edit", json!({"path": "src/lib.rs"})),
+        call("t6", "rg", json!({"pattern": "greet"})),
+    ]);
+    let tools = thread.items.iter().filter_map(|item| match item {
+        ChatItem::Tool(tool) => Some(tool),
+        _ => None,
+    });
+
+    assert_eq!(
+        group_label(tools),
+        "2 commands · 2 edits · 1 read · 1 search"
+    );
+}
+
+#[test]
+fn copilot_edit_reports_its_path_as_the_edited_file() {
+    let thread = thread(vec![call(
+        "t1",
+        "edit",
+        json!({"path": "src/lib.rs", "old_str": "a", "new_str": "b"}),
+    )]);
+
+    let ChatItem::Tool(tool) = &thread.items[0] else {
+        panic!("expected a tool item, got {:?}", thread.items[0]);
+    };
+    assert_eq!(tool.edited_file(), Some("src/lib.rs"));
+    assert_eq!(tool.summary(), "src/lib.rs");
+}
+
+#[test]
 fn group_label_counts_kinds_in_order_of_appearance() {
     let thread = thread(vec![
         call("t1", "Read", json!({})),
