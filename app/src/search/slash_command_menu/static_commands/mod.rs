@@ -123,6 +123,8 @@ pub enum SlashCommandKind {
     Chat,
     Resume,
     Claude,
+    Jira,
+    Pr,
 }
 
 /// The application surfaces on which a static slash command is implemented.

@@ -44,6 +44,7 @@ use crate::ai::blocklist::{
 use crate::ai::conversation_rename::rename_conversation;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::code_review::telemetry_event::CodeReviewPaneEntrypoint;
+use crate::jira::{IssueAction, JiraCommand};
 #[cfg(not(target_family = "wasm"))]
 use crate::search::slash_command_menu::static_commands::commands;
 use crate::search::slash_command_menu::static_commands::commands::COMMAND_REGISTRY;
@@ -911,6 +912,14 @@ impl Input {
             }
             SlashCommandKind::Task => {
                 ctx.dispatch_typed_action(&WorkspaceAction::OpenTaskAgentModal);
+            }
+            SlashCommandKind::Jira => {
+                ctx.dispatch_typed_action(&WorkspaceAction::Jira(JiraCommand::PickIssue(
+                    IssueAction::StartAgent,
+                )));
+            }
+            SlashCommandKind::Pr => {
+                ctx.dispatch_typed_action(&WorkspaceAction::OpenPrAgentModal);
             }
             SlashCommandKind::Chat => {
                 if CLIAgentSessionsModel::as_ref(ctx)

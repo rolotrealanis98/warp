@@ -572,6 +572,25 @@ fn cli_agent_commands_are_always_available_in_the_gui() {
 }
 
 #[test]
+fn jira_and_pr_commands_are_always_available_when_their_features_are_on() {
+    let _jira = FeatureFlag::JiraIntegration.override_enabled(true);
+    let _pr = FeatureFlag::PrReviewAgent.override_enabled(true);
+    let gui_commands = all_commands(settings::SettingsMode::Gui);
+
+    for (kind, name) in [
+        (SlashCommandKind::Jira, "/jira"),
+        (SlashCommandKind::Pr, "/pr"),
+    ] {
+        let command = gui_commands
+            .iter()
+            .find(|command| command.kind == kind)
+            .unwrap_or_else(|| panic!("expected {name} to be registered in GUI mode"));
+        assert_eq!(command.name, name);
+        assert_eq!(command.availability, Availability::ALWAYS, "{name}");
+    }
+}
+
+#[test]
 fn cli_agent_commands_are_not_registered_for_tui_mode() {
     let tui_commands = all_commands(settings::SettingsMode::Tui);
 
@@ -581,6 +600,8 @@ fn cli_agent_commands_are_not_registered_for_tui_mode() {
             | SlashCommandKind::Chat
             | SlashCommandKind::Resume
             | SlashCommandKind::Claude
+            | SlashCommandKind::Jira
+            | SlashCommandKind::Pr
     )));
 }
 

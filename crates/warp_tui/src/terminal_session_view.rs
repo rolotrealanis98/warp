@@ -4939,7 +4939,9 @@ impl TuiTerminalSessionView {
             | SlashCommandKind::Task
             | SlashCommandKind::Chat
             | SlashCommandKind::Resume
-            | SlashCommandKind::Claude => {
+            | SlashCommandKind::Claude
+            | SlashCommandKind::Jira
+            | SlashCommandKind::Pr => {
                 debug_assert!(
                     false,
                     "Attempted to execute GUI-only slash command in the TUI: {}",

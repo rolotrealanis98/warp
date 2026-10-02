@@ -894,8 +894,30 @@ pub const COPY_DEBUGGING_ID: StaticCommand = StaticCommand {
 };
 
 // Fork: commands that drive CLI agents (see FORK.md). Always available: none needs Warp AI.
-// ponytail: no `/jira` or `/pr` yet; add them here once the issue picker and PR review modal
-// have workspace actions to dispatch.
+
+pub const JIRA: StaticCommand = StaticCommand {
+    name: "/jira",
+    description: "Start a CLI agent on a Jira issue",
+    kind: SlashCommandKind::Jira,
+    supported_surfaces: SlashCommandSurfaces::GuiOnly {
+        icon_path: "bundled/svg/block-tasklist.svg",
+    },
+    availability: Availability::ALWAYS,
+    auto_enter_ai_mode: false,
+    argument: None,
+};
+
+pub const PR: StaticCommand = StaticCommand {
+    name: "/pr",
+    description: "Review a pull request with a CLI agent",
+    kind: SlashCommandKind::Pr,
+    supported_surfaces: SlashCommandSurfaces::GuiOnly {
+        icon_path: "bundled/svg/git-branch-02.svg",
+    },
+    availability: Availability::ALWAYS,
+    auto_enter_ai_mode: false,
+    argument: None,
+};
 
 pub const TASK: StaticCommand = StaticCommand {
     name: "/task",
@@ -1072,6 +1094,14 @@ fn all_commands_for_all_surfaces() -> Vec<StaticCommand> {
         RESUME,
         CLAUDE.clone(),
     ];
+
+    if FeatureFlag::JiraIntegration.is_enabled() {
+        commands.push(JIRA);
+    }
+
+    if FeatureFlag::PrReviewAgent.is_enabled() {
+        commands.push(PR);
+    }
 
     if FeatureFlag::LocalDockerSandbox.is_enabled() {
         commands.push(CREATE_DOCKER_SANDBOX);
