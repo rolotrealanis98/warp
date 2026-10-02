@@ -804,11 +804,24 @@ pub async fn get_repository_info(
     Err(anyhow!("Not supported without local_fs"))
 }
 
+#[cfg(not(feature = "local_fs"))]
+pub(crate) async fn run_gh_command(
+    _repo_path: &Path,
+    _args: &[&str],
+    _path_env: Option<&str>,
+) -> Result<String> {
+    Err(anyhow!("Not supported without local_fs"))
+}
+
 /// Runs a `gh` CLI command and returns stdout on success. `path_env`, when
 /// `Some`, is set as the child's `PATH` so a Homebrew-installed `gh` is
 /// findable from macOS GUI launches (launchd's minimal `PATH` excludes it).
 #[cfg(feature = "local_fs")]
-async fn run_gh_command(repo_path: &Path, args: &[&str], path_env: Option<&str>) -> Result<String> {
+pub(crate) async fn run_gh_command(
+    repo_path: &Path,
+    args: &[&str],
+    path_env: Option<&str>,
+) -> Result<String> {
     use command::Stdio;
     use command::r#async::Command;
 
@@ -1036,10 +1049,26 @@ pub async fn create_pr(
     path_env: Option<&str>,
 ) -> Result<PrInfo> {
     let base = detect_main_branch(repo_path).await?;
+    create_pr_with_base(repo_path, None, &base, title, body, path_env).await
+}
+
+/// Like [`create_pr`] but targets `base` (a branch name; an `origin/` prefix
+/// is stripped) instead of the detected default branch, and optionally a
+/// `head` branch other than the checked-out one. Used by stacked PRs, whose
+/// base is the branch below them in the stack.
+#[cfg(feature = "local_fs")]
+pub async fn create_pr_with_base(
+    repo_path: &Path,
+    head: Option<&str>,
+    base: &str,
+    title: Option<&str>,
+    body: Option<&str>,
+    path_env: Option<&str>,
+) -> Result<PrInfo> {
     let base = base.trim();
     let base = base.strip_prefix("origin/").unwrap_or(base);
     let sanitized_title;
-    let args: Vec<&str> = match (title, body) {
+    let mut args: Vec<&str> = match (title, body) {
         (Some(t), Some(b)) => {
             sanitized_title = sanitize_pr_title(t);
             vec![
@@ -1055,6 +1084,9 @@ pub async fn create_pr(
         }
         _ => vec!["pr", "create", "--base", base, "--fill"],
     };
+    if let Some(head) = head {
+        args.extend(["--head", head]);
+    }
     let stdout = run_gh_command(repo_path, &args, path_env).await?;
     // `gh pr create` prints the PR URL on success.
     let url = stdout.trim().to_string();
@@ -1083,6 +1115,18 @@ fn sanitize_pr_title(raw: &str) -> String {
 #[cfg(not(feature = "local_fs"))]
 pub async fn create_pr(
     _repo_path: &Path,
+    _title: Option<&str>,
+    _body: Option<&str>,
+    _path_env: Option<&str>,
+) -> Result<PrInfo> {
+    Err(anyhow!("Not supported on wasm"))
+}
+
+#[cfg(not(feature = "local_fs"))]
+pub async fn create_pr_with_base(
+    _repo_path: &Path,
+    _head: Option<&str>,
+    _base: &str,
     _title: Option<&str>,
     _body: Option<&str>,
     _path_env: Option<&str>,
