@@ -1310,7 +1310,7 @@ impl View for ConversationListView {
         } else if self.item_count() == 0 {
             Container::new(
                 Text::new_inline(
-                    "No matching conversations",
+                    "No matching sessions",
                     appearance.ui_font_family(),
                     appearance.ui_font_size(),
                 )

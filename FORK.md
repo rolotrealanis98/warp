@@ -129,8 +129,8 @@ Replace the templates locally with your own review instructions.
 
 Warp's generic agent surfaces drive CLI agents instead of Warp's agent:
 
-- **Agent dashboard** (`Cmd/Ctrl-Shift-M`, or **Agent > Open agent
-  dashboard**) and the **conversation list** in the left panel list every
+- **Agent dashboard** (`Cmd/Ctrl-Shift-M`, the header toolbar button, or
+  **Agent > Open agent dashboard**) and the **conversation list** in the left panel list every
   pane running a CLI agent (titled by its task key and title when started from
   a task, else by its latest prompt) and past Claude Code sessions stored under
   `~/.claude/projects` (or `$CLAUDE_CONFIG_DIR`) for the workspace's known
@@ -147,8 +147,9 @@ Warp's generic agent surfaces drive CLI agents instead of Warp's agent:
 - **Ask Claude Code** (footer of a long-running command): opens a tab in the
   pane's directory running Claude Code with the command and its output so far.
 - **Slash commands**: `/claude [first message]`, `/task` (task launcher),
-  `/chat` (chat view; also inside the CLI agent composer) and `/resume` (the
-  conversation menu on its "Current Directory" tab).
+  `/chat` (chat view; also inside the CLI agent composer), `/resume` (the
+  conversation menu on its "Current Directory" tab), `/jira` (start an agent on
+  a Jira issue) and `/pr` (PR review agent).
 - **Code review panel**: "Send to agent" goes to the CLI agent in a free
   terminal of the repository, or starts Claude Code with the comments in an idle
   one.

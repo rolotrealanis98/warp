@@ -436,8 +436,11 @@ impl AgentManagementView {
             return ViewState::Loading;
         }
 
-        // Show setup guide if: no items (zero state) or user clicked button to toggle on the guide
-        if !has_items || self.is_viewing_setup_guide {
+        // Show setup guide if: no items (zero state) or user clicked button to toggle on the guide.
+        // Fork: the guide is about Warp's cloud agents, so without Warp AI the zero state is the
+        // empty list.
+        let is_ai_enabled = AISettings::as_ref(app).is_any_ai_enabled(app);
+        if (!has_items && is_ai_enabled) || self.is_viewing_setup_guide {
             return ViewState::SetupGuide { has_items };
         }
 
@@ -1993,7 +1996,9 @@ impl AgentManagementView {
             }
 
             header_top.add_child(Expanded::new(1., Empty::new().finish()).finish());
-            header_top.add_child(ChildView::new(setup_guide_button).finish());
+            if AISettings::as_ref(app).is_any_ai_enabled(app) {
+                header_top.add_child(ChildView::new(setup_guide_button).finish());
+            }
 
             if !cfg!(target_family = "wasm") {
                 header_top.add_child(ChildView::new(new_agent_button).finish());
@@ -2167,8 +2172,13 @@ impl AgentManagementView {
         .with_height(24.)
         .finish();
 
+        let is_filtering = self.filters.is_filtering() || !self.search_query.trim().is_empty();
         let text = Text::new_inline(
-            "No results matched your filters",
+            if is_filtering {
+                "No results matched your filters"
+            } else {
+                "No agent sessions yet"
+            },
             appearance.ui_font_family(),
             appearance.ui_font_size(),
         )
@@ -2176,17 +2186,16 @@ impl AgentManagementView {
         .with_color(appearance.theme().nonactive_ui_text_color().into())
         .finish();
 
-        Align::new(
-            Flex::column()
-                .with_main_axis_size(MainAxisSize::Min)
-                .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                .with_spacing(12.)
-                .with_child(icon)
-                .with_child(text)
-                .with_child(ChildView::new(&self.no_filter_results_button).finish())
-                .finish(),
-        )
-        .finish()
+        let mut column = Flex::column()
+            .with_main_axis_size(MainAxisSize::Min)
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_spacing(12.)
+            .with_child(icon)
+            .with_child(text);
+        if is_filtering {
+            column.add_child(ChildView::new(&self.no_filter_results_button).finish());
+        }
+        Align::new(column.finish()).finish()
     }
 
     fn render_default_scroll_view(&self, app: &AppContext) -> Box<dyn Element> {

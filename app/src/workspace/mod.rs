@@ -1527,7 +1527,7 @@ pub fn init(app: &mut AppContext) {
 
     app.register_editable_bindings([EditableBinding::new(
         "workspace:toggle_agent_management_view",
-        BindingDescription::new("Toggle the agent management view")
+        BindingDescription::new("Toggle the agent dashboard")
             .with_custom_description(bindings::MAC_MENUS_CONTEXT, "Open agent dashboard"),
         WorkspaceAction::ToggleAgentManagementView,
     )

@@ -10,6 +10,7 @@ mod crash_recovery;
 pub(crate) mod feature_intro_modal;
 pub(crate) mod free_ai_removal_modal;
 pub mod global_search;
+mod jira;
 pub(crate) mod launch_modal;
 pub(crate) mod left_panel;
 pub(crate) mod onboarding;
@@ -19,7 +20,6 @@ mod pr_agent;
 pub(crate) mod right_panel;
 mod startup_directory;
 mod tab_grouping;
-mod jira;
 mod task_agent;
 #[cfg(test)]
 #[path = "view_tests.rs"]
@@ -20758,7 +20758,7 @@ impl Workspace {
                         icons::Icon::Grid,
                         &self.mouse_states.agent_management_view_button,
                         WorkspaceAction::ToggleAgentManagementView,
-                        "Agent management panel".to_string(),
+                        "Agent dashboard".to_string(),
                         keybinding_name_to_display_string(
                             "workspace:toggle_agent_management_view",
                             ctx,
