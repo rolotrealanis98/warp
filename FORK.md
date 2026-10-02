@@ -37,6 +37,48 @@ Settings (Settings > Third party CLI agents, or `settings.toml`):
 | `cli_chat_view.collapse_tool_output` | `true` | Successful tool calls start collapsed. |
 | `cli_chat_view.show_timestamps` | `false` | Show message times. |
 
+### Task agent launcher
+
+Command palette:
+
+- **Task agent: start on task…** opens a form: key, title, repository, where the
+  agent works (new worktree / new branch in the current checkout / current
+  checkout as is), base branch (defaults to the remote's default branch, fetched
+  first), branch name, agent CLI, initial prompt, and whether to run setup
+  commands. "Current checkout" has no git side effects.
+- **Task agent: rename this session from task…** names the current tab after a
+  key and title without launching anything.
+- **Task agent: open settings** (Settings > Agents > Task agents).
+
+The tab is titled from `session_title_template` and the pane header shows the
+task key as a chip (click to copy). Claude Code and Codex receive the initial
+prompt as their first argument, read from a file in Warp's cache directory;
+other agents get it typed into their input once their session starts.
+
+Settings (`task_agents.*` in `settings.toml`, never synced):
+
+| Key | Default |
+|-----|---------|
+| `branch_template` | `{{type}}/{{key}}-{{slug}}` |
+| `worktree_path_template` | `{{repo_parent}}/{{repo}}.worktrees/{{key}}-{{slug}}` |
+| `default_cli` | `claude` |
+| `push_on_create` | `true` |
+| `fetch_before_branch` | `true` |
+| `prompt_template` | `Work on this task: {{key}} {{title}}` + body + url |
+| `session_title_template` | `{{key}} {{short_title}}` |
+| `short_title_max_chars` | `32` |
+| `prefer_agent_title` | `false` |
+| `per_repo` | `{}` |
+
+Per-repository overrides:
+
+```toml
+[task_agents.per_repo."/path/to/octo/repo"]
+branch_template = "{{key}}/{{slug}}"
+setup_commands = ["npm ci"]
+default_cli = "codex"
+```
+
 Build without the fork features:
 
 ```sh
