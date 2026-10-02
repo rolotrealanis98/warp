@@ -28,7 +28,7 @@ strip write to the same PTY, so the session keeps running unchanged. The
 **Terminal** button (or the same shortcut) switches back. The transcript path
 is found most reliably with the Warp plugin for Claude Code installed.
 
-Settings (Settings > Third party CLI agents, or `settings.toml`):
+Settings (Settings > Agents > CLI agents, or `settings.toml`):
 
 | Key | Default | Meaning |
 |-----|---------|---------|
@@ -199,14 +199,32 @@ Settings (`[pr_stack]` in the settings file, most also on Settings > PR stack):
 `pr_body_file_template`, `pr_prepare_command`, `auto_restack`,
 `poll_interval_secs`, `row_order`.
 
-## Warp's own agent
+## No native Warp agent
 
-Warp's native agent, Active AI and related UI are controlled by the existing
-setting `agents.warp_agent.is_any_ai_enabled` (Settings > Warp Agent > the
-global toggle). Turn it off to hide them. Upstream onboarding sets it to `true`
-when an account is created, so the fork does not change the default; the
-switch is one click. CLI agent features (footer, session detection, the
-features above) do not depend on it.
+This fork has no native Warp agent; agent surfaces are driven by CLI agents
+(Claude Code first). This is the baseline, not a feature flag.
+
+- `AISettings::is_any_ai_enabled()` always returns `false`
+  (`FORK_HIDES_NATIVE_AGENT` in `app/src/settings/ai.rs`), so every Warp AI
+  surface upstream gates on it stays off: agent mode and its shortcuts, Active
+  AI, AI palette and context-menu entries, cloud agents, billing and
+  feature-intro modals. The stored `agents.warp_agent.is_any_ai_enabled`
+  setting now defaults to `false`, has no effect, and onboarding never sets it.
+- Settings: no Warp Agent, Profiles, Knowledge, Billing and usage, or Cloud
+  platform (Environments, API keys) pages. **Agents** holds **CLI agents**,
+  **MCP servers** and **Task agents**.
+- Menu bar: the **AI** menu is replaced by **Agent**: New Claude Code tab (a
+  tab in the current directory running `claude`), Start agent on task…, Toggle
+  chat view, Open agent dashboard. **File > New Claude Code tab** replaces New
+  Agent Tab, and the Drive menu drops prompts, rules and MCP servers.
+- One-time modals that promote Warp's agent (Oz, Warp Agent CLI,
+  orchestration, open-source announcement, ChatGPT plan) never open, and the
+  plan offer after sign-up is skipped.
+- The left panel's agent conversation list needs neither an account nor Warp
+  AI.
+
+CLI agent features (footer, session detection, notification inbox, the
+features above) do not depend on any of this.
 
 ## Branching and upstream sync
 
