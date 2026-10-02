@@ -79,7 +79,7 @@ impl Workspace {
 
         // Skip the guided tour when AI is not enabled (e.g. terminal-intent
         // users or users who disabled AI).
-        if !*AISettings::as_ref(ctx).is_any_ai_enabled {
+        if !AISettings::as_ref(ctx).is_any_ai_enabled(ctx) {
             return;
         }
 

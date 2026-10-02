@@ -41,7 +41,6 @@ use warpui::elements::{
 };
 use warpui::fonts::{Properties, Weight};
 use warpui::keymap::{ContextPredicate, Keystroke};
-use warpui::ui_components::button::ButtonVariant;
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::ui_components::switch::{SwitchStateHandle, TooltipConfig};
 use warpui::{
@@ -138,21 +137,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
     context: &ContextPredicate,
     builder: fn(SettingsAction) -> T,
 ) {
-    ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
-        vec![
-            ToggleSettingActionPair::new(
-                "AI",
-                builder(SettingsAction::WarpAgent(
-                    WarpAgentPageAction::ToggleGlobalAI,
-                )),
-                context,
-                flags::IS_ANY_AI_ENABLED,
-            )
-            .with_group(bindings::BindingGroup::WarpAi),
-        ],
-        app,
-    );
-
+    // Fork: no "Enable/Disable AI" palette pair; Warp AI cannot be turned on.
     ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
         vec![
             ToggleSettingActionPair::new(
@@ -2424,21 +2409,8 @@ impl WarpAgentPageView {
             ));
         }
 
-        let global_ai_switch_state = SwitchStateHandle::default();
-        let global_ai_sign_up_button = MouseStateHandle::default();
-        PageType::new_categorized(
-            categories,
-            Some(PageTitle::new("Warp Agent").with_trailing_element(
-                move |_view, appearance, app| {
-                    render_global_ai_toggle(
-                        &global_ai_switch_state,
-                        &global_ai_sign_up_button,
-                        appearance,
-                        app,
-                    )
-                },
-            )),
-        )
+        // Fork: no global AI switch in the title; Warp AI cannot be turned on.
+        PageType::new_categorized(categories, Some(PageTitle::new("Warp Agent")))
     }
 
     fn handle_detection_denylist_editor_event(
@@ -3210,115 +3182,6 @@ impl From<ViewHandle<WarpAgentPageView>> for SettingsPageViewHandle {
     fn from(view_handle: ViewHandle<WarpAgentPageView>) -> Self {
         SettingsPageViewHandle::WarpAgent(view_handle)
     }
-}
-
-/// The page title's trailing widget: the global master switch for all AI features.
-fn render_global_ai_toggle(
-    switch_state: &SwitchStateHandle,
-    sign_up_button: &MouseStateHandle,
-    appearance: &Appearance,
-    app: &AppContext,
-) -> Box<dyn Element> {
-    let ui_builder = appearance.ui_builder();
-    let is_ai_disabled_due_to_remote_session_org_policy =
-        AISettings::as_ref(app).is_ai_disabled_due_to_remote_session_org_policy(app);
-
-    let is_anonymous = AuthStateProvider::as_ref(app)
-        .get()
-        .is_anonymous_or_logged_out();
-
-    let mut row = Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
-
-    if is_ai_disabled_due_to_remote_session_org_policy {
-        row.add_child(
-            Container::new(
-                ConstrainedBox::new(
-                    Container::new(
-                        Text::new("Your organization disallows AI when the active pane contains content from a remote session", appearance.ui_font_family(), 12.)
-                            .with_color(appearance.theme().ui_warning_color())
-                            .finish()
-                    )
-                    .with_padding_left(8.)
-                    .with_padding_right(8.)
-                    .finish()
-                )
-                .with_max_width(400.)
-                .finish()
-            )
-            .with_margin_right(16.)
-            .finish()
-        );
-    }
-
-    // Show sign-up button for anonymous users, toggle for logged-in users
-    if is_anonymous {
-        row.add_child(
-            Flex::row()
-                .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                .with_child(
-                    Container::new(
-                        Text::new_inline(
-                            "To use AI features, please create an account.",
-                            appearance.ui_font_family(),
-                            14.,
-                        )
-                        .with_color(
-                            appearance
-                                .theme()
-                                .sub_text_color(appearance.theme().surface_2())
-                                .into_solid(),
-                        )
-                        .finish(),
-                    )
-                    .with_margin_right(16.)
-                    .finish(),
-                )
-                .with_child(
-                    Container::new(
-                        ui_builder
-                            .button(ButtonVariant::Accent, sign_up_button.clone())
-                            .with_style(UiComponentStyles {
-                                font_size: Some(14.),
-                                font_weight: Some(Weight::Semibold),
-                                border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
-                                padding: Some(Coords {
-                                    top: 8.,
-                                    bottom: 8.,
-                                    left: 24.,
-                                    right: 24.,
-                                }),
-                                ..Default::default()
-                            })
-                            .with_text_label("Sign up".to_owned())
-                            .build()
-                            .on_click(move |ctx, _, _| {
-                                ctx.dispatch_typed_action(WarpAgentPageAction::SignupAnonymousUser);
-                            })
-                            .finish(),
-                    )
-                    .with_padding_right(TOGGLE_BUTTON_RIGHT_PADDING)
-                    .finish(),
-                )
-                .finish(),
-        );
-    } else {
-        row.add_child(
-            Container::new(
-                ui_builder
-                    .switch(switch_state.clone())
-                    .check(AISettings::as_ref(app).is_any_ai_enabled(app))
-                    .build()
-                    .on_click(move |ctx, _, _| {
-                        ctx.dispatch_typed_action(WarpAgentPageAction::ToggleGlobalAI);
-                    })
-                    .finish(),
-            )
-            .with_padding_right(TOGGLE_BUTTON_RIGHT_PADDING)
-            .finish(),
-        );
-    }
-
-    row.finish()
 }
 
 fn is_next_command_toggleable(app: &AppContext) -> bool {

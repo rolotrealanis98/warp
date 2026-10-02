@@ -1209,11 +1209,22 @@ impl settings_value::SettingsValue for ToolbarCommandMap {
     }
 }
 
+/// Fork: Warp's native agent (and every other Warp AI feature) is hidden. See
+/// [`AISettings::is_any_ai_enabled`] and FORK.md.
+///
+/// Unit and integration test builds keep upstream's behaviour, so the upstream suites (many
+/// of which assume AI is on) keep covering the code each upstream merge brings in.
+/// ponytail: test builds cannot exercise the hidden state; make this a runtime switch if a
+/// fork test ever needs it.
+pub(crate) const FORK_HIDES_NATIVE_AGENT: bool = !cfg!(any(test, feature = "integration_tests"));
+
 define_settings_group!(AISettings, settings: [
     // If `false`, all AI features are disabled.
+    // Fork: defaults to `false` (`true` in test builds, as upstream); `is_any_ai_enabled()`
+    // ignores it in shipped builds.
     is_any_ai_enabled: IsAnyAIEnabled {
         type: bool,
-        default: true,
+        default: !FORK_HIDES_NATIVE_AGENT,
         supported_platforms: SupportedPlatforms::ALL,
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::No),
         surface: settings::SettingSurfaces::GUI,
@@ -2264,6 +2275,12 @@ impl AISettings {
     }
 
     pub fn is_any_ai_enabled(&self, app: &AppContext) -> bool {
+        // Fork: no native Warp agent. Every Warp AI surface hangs off this getter, so it
+        // stays off whatever the stored or synced value is. CLI agents do not depend on it.
+        if FORK_HIDES_NATIVE_AGENT {
+            return false;
+        }
+
         // Disable AI for anonymous and logged-out users.
         let is_anonymous_or_logged_out = AuthStateProvider::as_ref(app)
             .get()
