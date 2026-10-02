@@ -6,7 +6,8 @@ fn account_first_copy_matches_product_spec() {
         LoginPurpose::AccountFirst.copy(),
         (
             "Create an account",
-            "Access AI, run cloud agents, collaborate with teammates, and sync settings across devices.",
+            // Fork: no Warp AI or cloud agents to sign in for.
+            "Collaborate with teammates and sync settings across devices.",
         )
     );
     assert_eq!(

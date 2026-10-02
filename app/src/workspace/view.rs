@@ -4952,6 +4952,12 @@ impl Workspace {
 
     /// Add a new terminal tab and enter the agent view with a new conversation.
     fn add_terminal_tab_with_new_agent_view(&mut self, ctx: &mut ViewContext<Self>) {
+        // Fork: no native agent view. "New agent tab" entry points (palette, deeplinks,
+        // warpctrl, the conversation list) open a Claude Code tab instead.
+        if !AISettings::as_ref(ctx).is_any_ai_enabled(ctx) {
+            self.open_claude_code_tab(ctx);
+            return;
+        }
         let was_left_panel_open = self.active_tab_pane_group().as_ref(ctx).left_panel_open;
         self.add_new_session_tab_internal_with_default_session_mode_behavior(
             NewSessionSource::Tab,

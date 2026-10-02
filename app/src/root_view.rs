@@ -2426,6 +2426,13 @@ impl RootView {
             FtueAccountClass::Paid => {
                 self.complete_account_first(AccountFirstCompletion::PaidTeam, ctx);
             }
+            // Fork: the offer sells Warp's native agent; finish as if the user chose "later".
+            FtueAccountClass::FreeIcp if !AISettings::as_ref(ctx).is_any_ai_enabled(ctx) => {
+                self.complete_account_first(AccountFirstCompletion::FreeIcpSetupLater, ctx);
+            }
+            FtueAccountClass::FreeStandard if !AISettings::as_ref(ctx).is_any_ai_enabled(ctx) => {
+                self.complete_account_first(AccountFirstCompletion::FreeStandardSetupLater, ctx);
+            }
             FtueAccountClass::FreeIcp | FtueAccountClass::FreeStandard => {
                 let variant = offer_variant_for_account_class(account_class)
                     .expect("free account classes have an offer");

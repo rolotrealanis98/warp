@@ -49,6 +49,7 @@ use crate::network::NetworkStatus;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::{ClientId, ServerId, SyncId};
 use crate::server::server_api::ai::AIClient;
+use crate::settings::AISettings;
 use crate::themes::theme::AnsiColorIdentifier;
 use crate::ui_components::blended_colors;
 use crate::ui_components::breadcrumb::{self, BreadcrumbState};
@@ -1691,7 +1692,9 @@ impl WorkflowModal {
             AiAssistState::PreRequest => Some((AI_ASSIST_BUTTON_TEXT, Icon::AiAssistant)),
             AiAssistState::RequestInFlight => Some((AI_ASSIST_LOADING_TEXT, Icon::Refresh)),
             AiAssistState::Generated => None,
-        };
+        }
+        // Fork: Warp AI autofill, like the workflow editor, only shows with Warp AI.
+        .filter(|_| AISettings::as_ref(app).is_any_ai_enabled(app));
 
         if let Some((label, icon)) = label_and_icon {
             let text_and_icon = TextAndIcon::new(

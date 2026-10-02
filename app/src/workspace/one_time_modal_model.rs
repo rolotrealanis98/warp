@@ -514,6 +514,10 @@ impl OneTimeModalModel {
         if cfg!(target_family = "wasm") || !FeatureFlag::ChatGPTSubscription.is_enabled() {
             return false;
         }
+        // Fork: this modal promotes Warp's native agent, which the fork does not have.
+        if !AISettings::as_ref(ctx).is_any_ai_enabled(ctx) {
+            return false;
+        }
         if self.is_chatgpt_plan_modal_open
             || self.is_any_modal_open()
             || self.active_feature_intro.is_some()
@@ -827,6 +831,10 @@ impl OneTimeModalModel {
     }
 
     fn check_and_trigger_oz_launch_modal(&mut self, ctx: &mut ModelContext<Self>) -> bool {
+        // Fork: this modal promotes Warp's native agent, which the fork does not have.
+        if !AISettings::as_ref(ctx).is_any_ai_enabled(ctx) {
+            return false;
+        }
         // Only show if the feature flag is enabled.
         if !FeatureFlag::OzLaunchModal.is_enabled() {
             return false;
@@ -855,6 +863,10 @@ impl OneTimeModalModel {
     }
 
     fn check_and_trigger_openwarp_launch_modal(&mut self, ctx: &mut ModelContext<Self>) -> bool {
+        // Fork: this modal promotes Warp's native agent, which the fork does not have.
+        if !AISettings::as_ref(ctx).is_any_ai_enabled(ctx) {
+            return false;
+        }
         // Only show if the feature flag is enabled.
         if !FeatureFlag::OpenWarpLaunchModal.is_enabled() {
             return false;
@@ -887,6 +899,10 @@ impl OneTimeModalModel {
         &mut self,
         ctx: &mut ModelContext<Self>,
     ) -> bool {
+        // Fork: this modal promotes Warp's native agent, which the fork does not have.
+        if !AISettings::as_ref(ctx).is_any_ai_enabled(ctx) {
+            return false;
+        }
         if !FeatureFlag::OrchestrationLaunchModal.is_enabled() {
             return false;
         }
@@ -911,6 +927,10 @@ impl OneTimeModalModel {
     }
 
     fn check_and_trigger_agent_cli_launch_modal(&mut self, ctx: &mut ModelContext<Self>) -> bool {
+        // Fork: this modal promotes Warp's native agent, which the fork does not have.
+        if !AISettings::as_ref(ctx).is_any_ai_enabled(ctx) {
+            return false;
+        }
         if !FeatureFlag::AgentCliLaunchModal.is_enabled() {
             return false;
         }

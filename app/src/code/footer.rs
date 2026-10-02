@@ -1721,7 +1721,8 @@ impl View for CodeFooterView {
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_main_axis_size(MainAxisSize::Max);
 
-        if self.is_tab_config_footer() {
+        // Fork: the hint and the skill button point at Warp's native agent.
+        if self.is_tab_config_footer() && AISettings::as_ref(app).is_any_ai_enabled(app) {
             footer_content.add_child(Self::render_tab_config_info_icon(theme));
             footer_content.add_child(
                 Shrinkable::new(

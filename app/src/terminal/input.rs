@@ -15529,6 +15529,12 @@ impl Input {
             return;
         }
 
+        // Fork: agent input mode is Warp's native agent. Guarding here closes every caller,
+        // including the fixed cmd/ctrl-shift-i binding.
+        if !AISettings::as_ref(ctx).is_any_ai_enabled(ctx) {
+            return;
+        }
+
         let is_input_buffer_empty = self.editor.as_ref(ctx).buffer_text(ctx).is_empty();
 
         // When AgentView is enabled, reverting to AI mode in an active agent view with an empty

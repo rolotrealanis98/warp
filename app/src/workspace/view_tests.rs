@@ -642,6 +642,7 @@ fn test_tools_panel_preferences_activate_after_signup_and_ai_enablement() {
                 );
                 drop(left_panel.render(ctx));
 
+                // Fork: the conversation list hosts CLI agent sessions, so it never locks.
                 left_panel.handle_action_with_force_open(
                     &LeftPanelAction::ConversationListView,
                     false,
@@ -649,7 +650,7 @@ fn test_tools_panel_preferences_activate_after_signup_and_ai_enablement() {
                 );
                 assert_eq!(
                     left_panel.active_view_availability(ctx),
-                    left_panel::ToolPanelAvailability::RequiresAccount
+                    left_panel::ToolPanelAvailability::Available
                 );
                 drop(left_panel.render(ctx));
             });
@@ -672,8 +673,9 @@ fn test_tools_panel_preferences_activate_after_signup_and_ai_enablement() {
             assert!(*AISettings::as_ref(ctx).show_conversation_history);
             assert!(!WarpDriveSettings::is_warp_drive_available(ctx));
             assert!(!WarpDriveSettings::is_warp_drive_enabled(ctx));
-            assert!(!AISettings::as_ref(ctx).is_conversation_history_available(ctx));
-            assert!(!AISettings::as_ref(ctx).is_conversation_history_enabled(ctx));
+            // Fork: conversation history does not depend on an account or Warp AI.
+            assert!(AISettings::as_ref(ctx).is_conversation_history_available(ctx));
+            assert!(AISettings::as_ref(ctx).is_conversation_history_enabled(ctx));
         });
 
         // Signing up makes account-backed features available. AuthComplete
@@ -707,7 +709,7 @@ fn test_tools_panel_preferences_activate_after_signup_and_ai_enablement() {
             );
             assert!(!workspace.auth_state.is_anonymous_or_logged_out());
             assert!(WarpDriveSettings::is_warp_drive_enabled(ctx));
-            assert!(!AISettings::as_ref(ctx).is_conversation_history_enabled(ctx));
+            assert!(AISettings::as_ref(ctx).is_conversation_history_enabled(ctx));
             workspace.left_panel_view.update(ctx, |left_panel, ctx| {
                 left_panel.handle_action_with_force_open(&LeftPanelAction::WarpDrive, false, ctx);
                 assert_eq!(
@@ -722,7 +724,7 @@ fn test_tools_panel_preferences_activate_after_signup_and_ai_enablement() {
                 );
                 assert_eq!(
                     left_panel.active_view_availability(ctx),
-                    left_panel::ToolPanelAvailability::RequiresAi
+                    left_panel::ToolPanelAvailability::Available
                 );
                 drop(left_panel.render(ctx));
             });

@@ -104,9 +104,10 @@ impl LoginPurpose {
                 "Create an account",
                 "Create a Warp account to enable AI-powered planning, coding, and automations.",
             ),
+            // Fork: no Warp AI or cloud agents to sign in for.
             LoginPurpose::AccountFirst => (
                 "Create an account",
-                "Access AI, run cloud agents, collaborate with teammates, and sync settings across devices.",
+                "Collaborate with teammates and sync settings across devices.",
             ),
         }
     }
@@ -1112,9 +1113,16 @@ impl LoginSlideView {
                 WARP_DRIVE_FEATURES,
                 "Enable Warp Drive",
             ),
-            LoginPurpose::WarpAgent | LoginPurpose::ThirdParty | LoginPurpose::AccountFirst => (
+            LoginPurpose::WarpAgent | LoginPurpose::ThirdParty => (
                 "Continue without signing in?",
                 "Without an account, you won't have access to Warp's AI features. Sign in anytime to unlock agents and other AI features.",
+                &[],
+                "Sign in",
+            ),
+            // Fork: no Warp AI to miss out on.
+            LoginPurpose::AccountFirst => (
+                "Continue without signing in?",
+                "Without an account, you won't have Warp Drive, settings sync, or team features. Sign in anytime.",
                 &[],
                 "Sign in",
             ),

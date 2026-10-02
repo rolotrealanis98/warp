@@ -1261,6 +1261,7 @@ pub fn init(app: &mut AppContext) {
     // Oz and Warp Control CLI install/uninstall actions (macOS only)
     #[cfg(target_os = "macos")]
     {
+        // Fork: the Oz CLI is Warp's native agent, so its palette entries need Warp AI.
         app.register_editable_bindings([
             EditableBinding::new(
                 "workspace:install_cli",
@@ -1268,14 +1269,14 @@ pub fn init(app: &mut AppContext) {
                 WorkspaceAction::InstallOz,
             )
             .with_group(bindings::BindingGroup::Settings.as_str())
-            .with_context_predicate(id!("Workspace")),
+            .with_context_predicate(id!("Workspace") & id!(flags::IS_ANY_AI_ENABLED)),
             EditableBinding::new(
                 "workspace:uninstall_cli",
                 "Undo global Oz CLI installation (oz will still work within Warp)",
                 WorkspaceAction::UninstallOz,
             )
             .with_group(bindings::BindingGroup::Settings.as_str())
-            .with_context_predicate(id!("Workspace")),
+            .with_context_predicate(id!("Workspace") & id!(flags::IS_ANY_AI_ENABLED)),
         ]);
         if FeatureFlag::WarpControlCli.is_enabled() {
             app.register_editable_bindings([

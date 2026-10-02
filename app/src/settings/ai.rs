@@ -2297,8 +2297,9 @@ impl AISettings {
     /// The stored `show_conversation_history` preference is kept separately so
     /// an onboarding choice can take effect automatically after signup and AI
     /// enablement without asking the user to toggle the setting again.
-    pub fn is_conversation_history_available(&self, app: &AppContext) -> bool {
-        self.is_any_ai_enabled(app)
+    pub fn is_conversation_history_available(&self, _app: &AppContext) -> bool {
+        // Fork: the conversation list shows CLI agent sessions, which need no Warp AI.
+        true
     }
 
     /// Returns whether conversation history should currently appear in the

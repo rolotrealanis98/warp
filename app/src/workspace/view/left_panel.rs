@@ -24,7 +24,6 @@ use crate::TelemetryEvent;
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent_conversations_model::AgentConversationsModel;
 use crate::appearance::Appearance;
-use crate::auth::AuthStateProvider;
 use crate::code::buffer_location::LocalOrRemotePath;
 #[cfg(feature = "local_fs")]
 use crate::code::file_tree::FileTreeEvent;
@@ -44,7 +43,6 @@ use crate::pr_stack::{PrStackPanel, PrStackPanelEvent};
 #[cfg(feature = "local_fs")]
 use crate::server::telemetry::CodePanelsFileOpenEntrypoint;
 use crate::server::telemetry::{FileTreeSource, WarpDriveSource};
-use crate::settings::AISettings;
 use crate::settings_view::keybindings::{KeybindingChangedEvent, KeybindingChangedNotifier};
 use crate::terminal::resizable_data::{ModalType, ResizableData};
 use crate::ui_components::buttons::{icon_button, icon_button_with_color};
@@ -96,7 +94,6 @@ pub enum LeftPanelAction {
 pub(crate) enum ToolPanelAvailability {
     Available,
     RequiresAccount,
-    RequiresAi,
 }
 
 impl ToolPanelView {
@@ -112,18 +109,8 @@ impl ToolPanelView {
                     ToolPanelAvailability::RequiresAccount
                 }
             }
-            ToolPanelView::ConversationListView => {
-                if AuthStateProvider::as_ref(app)
-                    .get()
-                    .is_anonymous_or_logged_out()
-                {
-                    ToolPanelAvailability::RequiresAccount
-                } else if AISettings::as_ref(app).is_conversation_history_available(app) {
-                    ToolPanelAvailability::Available
-                } else {
-                    ToolPanelAvailability::RequiresAi
-                }
-            }
+            // Fork: the list shows CLI agent sessions, which need neither an account nor Warp AI.
+            ToolPanelView::ConversationListView => ToolPanelAvailability::Available,
         }
     }
 }
@@ -270,24 +257,10 @@ impl LeftPanelView {
                 "Sign in to access Warp Drive",
                 "Create an account to save and share workflows, notebooks, prompts, and more.",
             ),
-            (ToolPanelView::ConversationListView, ToolPanelAvailability::RequiresAccount) => (
-                "Sign in to access Agent conversations",
-                "Create an account and enable AI to access your conversation history.",
-            ),
-            (ToolPanelView::ConversationListView, ToolPanelAvailability::RequiresAi) => (
-                "Turn on AI to access Agent conversations",
-                "Enable Warp AI to access your conversation history.",
-            ),
             (
                 ToolPanelView::ProjectExplorer
                 | ToolPanelView::GlobalSearch { .. }
-                | ToolPanelView::WarpDrive
-                | ToolPanelView::PrStack,
-                ToolPanelAvailability::RequiresAi,
-            )
-            | (
-                ToolPanelView::ProjectExplorer
-                | ToolPanelView::GlobalSearch { .. }
+                | ToolPanelView::ConversationListView
                 | ToolPanelView::PrStack,
                 ToolPanelAvailability::RequiresAccount,
             )
