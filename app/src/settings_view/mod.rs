@@ -28,6 +28,7 @@ use settings_page::{
     SettingsPageViewHandle,
 };
 use show_blocks_view::{ShowBlocksEvent, ShowBlocksView};
+use jira_page::JiraPageView;
 use task_agents_page::TaskAgentsPageView;
 use teams_page::{TeamsPageAction, TeamsPageView, TeamsPageViewEvent};
 use warp_agent_page::{WarpAgentPageAction, WarpAgentPageEvent, WarpAgentPageView};
@@ -122,6 +123,7 @@ mod settings_file_footer;
 pub(crate) mod settings_page;
 mod show_blocks_view;
 mod tab_menu;
+mod jira_page;
 mod task_agents_page;
 mod teams_page;
 mod telemetry;
@@ -338,6 +340,7 @@ pub enum SettingsSection {
     ThirdPartyCLIAgents,
     TaskAgents,
     PrAgent,
+    Jira,
     // ── Code umbrella subpages ──
     CodeIndexing,
     EditorAndCodeReview,
@@ -367,6 +370,7 @@ impl Display for SettingsSection {
             SettingsSection::ThirdPartyCLIAgents => write!(f, "Third party CLI agents"),
             SettingsSection::TaskAgents => write!(f, "Task agents"),
             SettingsSection::PrAgent => write!(f, "PR agent"),
+            SettingsSection::Jira => write!(f, "Jira"),
             SettingsSection::CodeIndexing => write!(f, "Indexing and projects"),
             SettingsSection::EditorAndCodeReview => write!(f, "Editor and Code Review"),
             SettingsSection::CloudEnvironments => write!(f, "Environments"),
@@ -413,6 +417,7 @@ impl SettingsSection {
             Self::ThirdPartyCLIAgents => "Third party CLI agents",
             Self::TaskAgents => "Task agents",
             Self::PrAgent => "PR agent",
+            Self::Jira => "Jira",
             Self::CodeIndexing => "Indexing and projects",
             Self::EditorAndCodeReview => "Editor and Code Review",
             Self::CloudEnvironments => "Environments",
@@ -455,6 +460,7 @@ impl SettingsSection {
             "Third party CLI agents" | "ThirdPartyCLIAgents" => Self::ThirdPartyCLIAgents,
             "Task agents" | "TaskAgents" => Self::TaskAgents,
             "PR agent" | "PrAgent" => Self::PrAgent,
+            "Jira" => Self::Jira,
             // "Code" named the combined page before it split in two.
             "Indexing and projects" | "CodeIndexing" | "Code" => Self::CodeIndexing,
             "Editor and Code Review" | "EditorAndCodeReview" => Self::EditorAndCodeReview,
@@ -1187,6 +1193,7 @@ macro_rules! update_page {
             SettingsPageViewHandle::TaskAgents(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::PrStack(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::PrAgent(handle) => $ctx.update_view(handle, $update),
+            SettingsPageViewHandle::Jira(handle) => $ctx.update_view(handle, $update),
         }
     };
 }
@@ -1433,6 +1440,11 @@ impl SettingsView {
                 ctx.add_typed_action_view(PrAgentPageView::new),
             ));
         }
+        if FeatureFlag::JiraIntegration.is_enabled() {
+            settings_pages.push(SettingsPage::new(
+                ctx.add_typed_action_view(JiraPageView::new),
+            ));
+        }
 
         settings_pages.extend(vec![
             SettingsPage::new(mcp_servers_page_handle),
@@ -1455,6 +1467,9 @@ impl SettingsView {
         }
         if FeatureFlag::PrReviewAgent.is_enabled() {
             agent_subpages.push(SettingsSection::PrAgent);
+        }
+        if FeatureFlag::JiraIntegration.is_enabled() {
+            agent_subpages.push(SettingsSection::Jira);
         }
         let mut nav_items = vec![
             SettingsNavItem::Page(SettingsSection::Account),
@@ -2194,6 +2209,7 @@ impl SettingsView {
             SettingsPageViewHandle::TaskAgents(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::PrStack(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::PrAgent(v) => v.as_ref(app).should_render(app),
+            SettingsPageViewHandle::Jira(v) => v.as_ref(app).should_render(app),
         }
     }
 

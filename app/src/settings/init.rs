@@ -110,6 +110,7 @@ pub fn register_all_settings(ctx: &mut AppContext) {
     SemanticSelection::register(ctx);
     crate::task_agent::settings::TaskAgentSettings::register(ctx);
     crate::pr_agent::settings::PrAgentSettings::register(ctx);
+    crate::jira::settings::JiraSettings::register(ctx);
     if FeatureFlag::WarpControlCli.is_enabled() {
         LocalControlSettings::register(ctx);
     }

@@ -48,6 +48,7 @@ use super::privacy_page::PrivacyPageView;
 use super::referrals_page::ReferralsPageView;
 use super::scripting_page::ScriptingSettingsPageView;
 use super::show_blocks_view::ShowBlocksView;
+use super::jira_page::JiraPageView;
 use super::task_agents_page::TaskAgentsPageView;
 use super::teams_page::TeamsPageView;
 use super::warp_agent_page::WarpAgentPageView;
@@ -136,6 +137,7 @@ pub enum SettingsPageViewHandle {
     TaskAgents(ViewHandle<TaskAgentsPageView>),
     PrStack(ViewHandle<PrStackPageView>),
     PrAgent(ViewHandle<PrAgentPageView>),
+    Jira(ViewHandle<JiraPageView>),
 }
 
 impl SettingsPageViewHandle {
@@ -167,6 +169,7 @@ impl SettingsPageViewHandle {
             TaskAgents(view_handle) => ChildView::new(view_handle).finish(),
             PrStack(view_handle) => ChildView::new(view_handle).finish(),
             PrAgent(view_handle) => ChildView::new(view_handle).finish(),
+            Jira(view_handle) => ChildView::new(view_handle).finish(),
         }
     }
 }
