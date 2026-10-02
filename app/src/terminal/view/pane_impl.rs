@@ -41,6 +41,7 @@ use crate::pane_group::{BackingView, SplitPaneState, TOGGLE_MAXIMIZE_PANE_BINDIN
 use crate::settings::app_installation_detection::{
     UserAppInstallDetectionSettings, UserAppInstallStatus,
 };
+use crate::task_agent::TaskSessionsModel;
 use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::terminal::shared_session::SharedSessionActionSource;
 use crate::terminal::shared_session::manager::Manager;
@@ -372,6 +373,9 @@ impl TerminalView {
                     Shrinkable::new(1.0, title_text).finish()
                 };
             center_row.add_child(title_element);
+        }
+        if let Some(key_chip) = TaskSessionsModel::render_key_chip(self.view_id, app) {
+            center_row.add_child(Container::new(key_chip).with_margin_left(6.).finish());
         }
 
         center_row.finish()
@@ -757,6 +761,7 @@ impl BackingView for TerminalView {
             || is_fullscreen_agent_view
             || FeatureFlag::ContextWindowUsageV2.is_enabled()
                 && self.split_pane_state(app).is_in_split_pane()
+            || TaskSessionsModel::has_key(self.view_id, app)
     }
 
     fn render_header_content(
