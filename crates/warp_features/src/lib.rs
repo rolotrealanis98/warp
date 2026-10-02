@@ -994,6 +994,18 @@ pub enum FeatureFlag {
     /// replace inline computer-use screenshot bytes with references to
     /// Warp-managed object storage.
     StoredScreenshots,
+
+    // --- Fork features (see FORK.md). Each gates one opt-in feature of this fork. ---
+    /// Chat-style rendering of a running CLI coding agent session in the same pane.
+    CliAgentChatView,
+    /// "Start agent on task" launcher: optional worktree/branch creation, session naming.
+    TaskAgentLauncher,
+    /// Jira issue picker and client (API token in keychain).
+    JiraIntegration,
+    /// PR review agent: checkout a PR, launch an agent, watch PR events.
+    PrReviewAgent,
+    /// PR stack ledger in the left panel: stack-relative diffs, submit, restack.
+    PrStackView,
 }
 
 static FLAG_STATES: [AtomicBool; cardinality::<FeatureFlag>()] =

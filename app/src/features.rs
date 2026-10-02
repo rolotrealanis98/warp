@@ -529,6 +529,16 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::HistorySearchRankingV2,
         #[cfg(feature = "stored_screenshots")]
         FeatureFlag::StoredScreenshots,
+        #[cfg(feature = "cli_agent_chat_view")]
+        FeatureFlag::CliAgentChatView,
+        #[cfg(feature = "task_agent_launcher")]
+        FeatureFlag::TaskAgentLauncher,
+        #[cfg(feature = "jira_integration")]
+        FeatureFlag::JiraIntegration,
+        #[cfg(feature = "pr_review_agent")]
+        FeatureFlag::PrReviewAgent,
+        #[cfg(feature = "pr_stack_view")]
+        FeatureFlag::PrStackView,
     ]);
 
     flags
