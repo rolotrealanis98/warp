@@ -10,6 +10,7 @@ use warp_cli::agent::Harness;
 use warp_core::features::FeatureFlag;
 use warpui::{App, EntityId, ModelHandle, SingletonEntity};
 
+use super::cli_agents::ClaudeHistorySession;
 use super::entry::{
     AgentConversationEntryId, AgentConversationNavigationSubject, AgentConversationProvenance,
 };
@@ -43,6 +44,12 @@ use crate::auth::AuthStateProvider;
 use crate::cloud_object::{Owner, Revision, ServerMetadata, ServerPermissions};
 use crate::server::ids::ServerId;
 use crate::server::server_api::presigned_upload::HttpStatusError;
+use crate::task_agent::{Checkout, TaskSession, TaskSessionsModel};
+use crate::terminal::CLIAgent;
+use crate::terminal::cli_agent_sessions::{
+    CLIAgentInputState, CLIAgentSession, CLIAgentSessionContext, CLIAgentSessionStatus,
+    CLIAgentSessionsModel,
+};
 use crate::test_util::ai_agent_tasks::{create_api_task, create_message};
 use crate::test_util::settings::initialize_history_persistence_for_tests;
 use crate::workspace::{WorkspaceAction, WorkspaceRegistry};
@@ -746,6 +753,7 @@ fn create_test_model() -> AgentConversationsModel {
         task_fetch_state: Default::default(),
         rtc_task_refresh_throttle_state: RtcTaskRefreshThrottleState::default(),
         dirty_since: None,
+        cli_agents: Default::default(),
     }
 }
 
@@ -2865,6 +2873,7 @@ fn test_harness_filter_matches_only_selected_harness() {
                         AgentConversationEntryId::Conversation(conversation_id) => {
                             format!("conversation:{conversation_id}")
                         }
+                        other => panic!("unexpected CLI agent row {other:?}"),
                     })
                     .collect()
             };
@@ -3119,4 +3128,170 @@ fn test_agent_management_filters_serde_backwards_compat() {
     }"#;
     let decoded: AgentManagementFilters = serde_json::from_str(forward).unwrap();
     assert_eq!(decoded.harness, HarnessFilter::All);
+}
+
+const LIVE_CLAUDE_SESSION: &str = "00000000-0000-4000-8000-0000000000a1";
+const PAST_CLAUDE_SESSION: &str = "00000000-0000-4000-8000-0000000000a2";
+
+fn claude_pane_session(session_id: &str, prompt: &str) -> CLIAgentSession {
+    CLIAgentSession {
+        agent: CLIAgent::Claude,
+        status: CLIAgentSessionStatus::InProgress,
+        session_context: CLIAgentSessionContext {
+            cwd: Some("/work/example-repo".to_owned()),
+            session_id: Some(session_id.to_owned()),
+            query: Some(prompt.to_owned()),
+            ..Default::default()
+        },
+        input_state: CLIAgentInputState::Closed,
+        should_auto_toggle_input: false,
+        listener: None,
+        plugin_version: None,
+        remote_host: None,
+        draft_text: None,
+        custom_command_prefix: None,
+        received_rich_notification: true,
+    }
+}
+
+fn past_claude_session(
+    session_id: &str,
+    title: &str,
+    last_updated: DateTime<Utc>,
+) -> ClaudeHistorySession {
+    ClaudeHistorySession {
+        session_id: session_id.parse().unwrap(),
+        cwd: "/work/example-repo".into(),
+        title: title.to_owned(),
+        last_updated,
+    }
+}
+
+/// A model with one Claude Code pane (`terminal_view_id`, running `LIVE_CLAUDE_SESSION`) and
+/// both sessions in its history.
+fn model_with_claude_pane(app: &mut App, terminal_view_id: EntityId) -> AgentConversationsModel {
+    add_entry_projection_test_models(app);
+    let sessions = app.add_singleton_model(|_| CLIAgentSessionsModel::new());
+    sessions.update(app, |sessions, ctx| {
+        sessions.set_session(
+            terminal_view_id,
+            claude_pane_session(LIVE_CLAUDE_SESSION, "Fix the build"),
+            ctx,
+        );
+    });
+    let now = Utc::now();
+    let mut model = create_test_model();
+    model.cli_agents.activity.insert(terminal_view_id, now);
+    model.cli_agents.history = vec![
+        past_claude_session(
+            LIVE_CLAUDE_SESSION,
+            "Fix the build",
+            now - Duration::hours(1),
+        ),
+        past_claude_session(PAST_CLAUDE_SESSION, "Add a test", now - Duration::hours(2)),
+    ];
+    model
+}
+
+#[test]
+fn get_entries_lists_cli_agent_panes_and_past_sessions_not_running() {
+    App::test((), |mut app| async move {
+        let terminal_view_id = EntityId::new();
+        let model = model_with_claude_pane(&mut app, terminal_view_id);
+
+        app.update(|ctx| {
+            let entries = model.get_entries(&all_owner_filters(), &TeamlessScopeForTest, ctx);
+
+            let ids: Vec<_> = entries.iter().map(|entry| entry.id).collect();
+            assert_eq!(
+                ids,
+                vec![
+                    AgentConversationEntryId::CliSession(terminal_view_id),
+                    AgentConversationEntryId::ClaudeHistory(PAST_CLAUDE_SESSION.parse().unwrap()),
+                ]
+            );
+            assert_eq!(entries[0].display.title, "Fix the build");
+            assert_eq!(
+                entries[0].display.status,
+                AgentRunDisplayStatus::ConversationInProgress
+            );
+            assert_eq!(entries[0].display.harness, Some(Harness::Claude));
+            assert_eq!(entries[1].display.title, "Add a test");
+            assert_eq!(
+                entries[1].display.working_directory.as_deref(),
+                Some("/work/example-repo")
+            );
+            assert!(entries.iter().all(|entry| entry.capabilities.can_open
+                && !entry.capabilities.can_share
+                && !entry.capabilities.can_delete));
+        });
+    });
+}
+
+#[test]
+fn cli_agent_pane_launched_for_a_task_is_titled_by_the_task() {
+    App::test((), |mut app| async move {
+        let terminal_view_id = EntityId::new();
+        let model = model_with_claude_pane(&mut app, terminal_view_id);
+        let tasks = app.add_singleton_model(TaskSessionsModel::new);
+        tasks.update(&mut app, |tasks, _| {
+            tasks.set(
+                terminal_view_id,
+                TaskSession {
+                    key: Some("EXAMPLE-123".to_owned()),
+                    title: "Fix login redirect".to_owned(),
+                    url: None,
+                    repo_root: "/work/example-repo".into(),
+                    branch: None,
+                    checkout: Checkout::Here,
+                },
+            );
+        });
+
+        app.update(|ctx| {
+            let entry = model
+                .get_entry_by_id(&AgentConversationEntryId::CliSession(terminal_view_id), ctx)
+                .expect("the pane should have a row");
+
+            assert_eq!(entry.display.title, "EXAMPLE-123 Fix login redirect");
+        });
+    });
+}
+
+#[test]
+fn cli_agent_rows_focus_their_pane_or_resume_their_session() {
+    App::test((), |mut app| async move {
+        let terminal_view_id = EntityId::new();
+        let model = model_with_claude_pane(&mut app, terminal_view_id);
+        app.add_singleton_model(|_| model);
+
+        app.update(|ctx| {
+            let live = AgentConversationsModel::resolve_open_action(
+                AgentConversationNavigationSubject::Entry(AgentConversationEntryId::CliSession(
+                    terminal_view_id,
+                )),
+                None,
+                ctx,
+            );
+            let past = AgentConversationsModel::resolve_open_action(
+                AgentConversationNavigationSubject::Entry(AgentConversationEntryId::ClaudeHistory(
+                    PAST_CLAUDE_SESSION.parse().unwrap(),
+                )),
+                None,
+                ctx,
+            );
+
+            assert!(matches!(
+                live,
+                Some(WorkspaceAction::FocusTerminalViewInWorkspace { terminal_view_id: id })
+                    if id == terminal_view_id
+            ));
+            assert!(matches!(
+                past,
+                Some(WorkspaceAction::ResumeClaudeSession { cwd, session_id })
+                    if cwd == std::path::Path::new("/work/example-repo")
+                        && session_id.to_string() == PAST_CLAUDE_SESSION
+            ));
+        });
+    });
 }

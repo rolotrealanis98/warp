@@ -1,8 +1,10 @@
+mod cli_agents;
 #[allow(dead_code)]
 pub mod entry;
 mod query;
 
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
@@ -59,6 +61,11 @@ use crate::server::server_api::ai::TaskListFilter;
 use crate::server::server_api::presigned_upload::HttpStatusError;
 use crate::server::team_scope::RequestTeamScope;
 use crate::settings::AISettings;
+use crate::task_agent::TaskSessionsModel;
+use crate::terminal::CLIAgent;
+use crate::terminal::cli_agent_sessions::{
+    CLIAgentSession, CLIAgentSessionsModel, CLIAgentSessionsModelEvent,
+};
 use crate::ui_components::icons::Icon;
 use crate::workspace::{RestoreConversationLayout, WorkspaceAction};
 use crate::workspaces::user_workspaces::{TeamContextResolver, TeamScope};
@@ -646,6 +653,8 @@ pub struct AgentConversationsModel {
     /// Earliest RTC timestamp received while no list surface was open.
     /// On next `register_view_open`, triggers a single `fetch_tasks_updated_after`.
     dirty_since: Option<DateTime<Utc>>,
+    /// Fork: state behind the CLI agent session rows.
+    cli_agents: cli_agents::CliAgentRows,
 }
 
 pub enum AgentConversationsModelEvent {
@@ -696,6 +705,7 @@ impl AgentConversationsModel {
                 task_fetch_state: HashMap::new(),
                 rtc_task_refresh_throttle_state: RtcTaskRefreshThrottleState::default(),
                 dirty_since: None,
+                cli_agents: Default::default(),
             };
         }
 
@@ -725,6 +735,13 @@ impl AgentConversationsModel {
             ctx.subscribe_to_model(&update_manager, Self::handle_update_manager_event);
         }
 
+        if ctx.has_singleton_model::<CLIAgentSessionsModel>() {
+            let cli_agent_sessions = CLIAgentSessionsModel::handle(ctx);
+            ctx.subscribe_to_model(&cli_agent_sessions, |me, _, event, ctx| {
+                me.handle_cli_agent_sessions_event(event, ctx);
+            });
+        }
+
         let mut model = Self {
             tasks: HashMap::new(),
             conversations: HashMap::new(),
@@ -735,7 +752,9 @@ impl AgentConversationsModel {
             task_fetch_state: HashMap::new(),
             rtc_task_refresh_throttle_state: RtcTaskRefreshThrottleState::default(),
             dirty_since: None,
+            cli_agents: Default::default(),
         };
+        model.refresh_claude_history(None, ctx);
 
         // Only sync local conversations if we're not in CLI mode. Server-side data
         // (tasks and cloud conversation metadata) is fetched on AuthComplete instead of
@@ -1144,6 +1163,140 @@ impl AgentConversationsModel {
         if let Some(dirty_since) = self.dirty_since.take() {
             self.fetch_tasks_updated_after(dirty_since, ctx);
         }
+        self.refresh_claude_history(None, ctx);
+    }
+
+    /// Fork: rescans Claude Code's stored sessions in the background (see
+    /// [`cli_agents::scan_claude_history`]) for the workspace's known repositories and the
+    /// directories CLI agents ran in, plus `cwd` (remembered for later scans). Emits
+    /// `ConversationsLoaded` when the list changes.
+    pub(crate) fn refresh_claude_history(
+        &mut self,
+        cwd: Option<PathBuf>,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        if let Some(cwd) = cwd {
+            self.cli_agents.remember_cwd(cwd);
+        }
+        #[cfg(not(target_family = "wasm"))]
+        {
+            use crate::ai::agent_sdk::driver::harness::claude_transcript::claude_config_dir;
+            use crate::ai::persisted_workspace::PersistedWorkspace;
+
+            let mut cwds = self.cli_agents.cwds.clone();
+            if ctx.has_singleton_model::<PersistedWorkspace>() {
+                cwds.extend(
+                    PersistedWorkspace::as_ref(ctx)
+                        .workspaces()
+                        .map(|workspace| workspace.path),
+                );
+            }
+            if cwds.is_empty() {
+                return;
+            }
+            let Ok(projects_dir) = claude_config_dir().map(|dir| dir.join("projects")) else {
+                return;
+            };
+            let mut titles = std::mem::take(&mut self.cli_agents.titles);
+            ctx.spawn(
+                async move {
+                    let history =
+                        cli_agents::scan_claude_history(&projects_dir, &cwds, &mut titles);
+                    (history, titles)
+                },
+                |me, (history, titles), ctx| {
+                    me.cli_agents.titles = titles;
+                    if me.cli_agents.history != history {
+                        me.cli_agents.history = history;
+                        ctx.emit(AgentConversationsModelEvent::ConversationsLoaded);
+                    }
+                },
+            );
+        }
+    }
+
+    fn handle_cli_agent_sessions_event(
+        &mut self,
+        event: &CLIAgentSessionsModelEvent,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        let terminal_view_id = event.terminal_view_id();
+        match event {
+            CLIAgentSessionsModelEvent::Started { .. }
+            | CLIAgentSessionsModelEvent::StatusChanged { .. }
+            | CLIAgentSessionsModelEvent::SessionUpdated { .. } => {
+                self.cli_agents
+                    .activity
+                    .insert(terminal_view_id, Utc::now());
+                if let Some(cwd) = CLIAgentSessionsModel::as_ref(ctx)
+                    .session(terminal_view_id)
+                    .and_then(|session| session.session_context.cwd.clone())
+                {
+                    self.cli_agents.remember_cwd(PathBuf::from(cwd));
+                }
+            }
+            CLIAgentSessionsModelEvent::Ended { .. } => {
+                self.cli_agents.activity.remove(&terminal_view_id);
+                // The ended session now belongs in the history.
+                self.refresh_claude_history(None, ctx);
+            }
+            CLIAgentSessionsModelEvent::InputSessionChanged { .. } => return,
+        }
+        ctx.emit(AgentConversationsModelEvent::ConversationUpdated {
+            kind: ConversationUpdateKind::MetadataChanged,
+        });
+    }
+
+    /// Fork: rows for live CLI agent panes and for past Claude Code sessions that are not
+    /// running in a pane.
+    fn cli_agent_entries(&self, app: &AppContext) -> Vec<AgentConversationEntry> {
+        let Some(sessions) = cli_agent_sessions(app) else {
+            return Vec::new();
+        };
+        let mut live_session_ids = HashSet::new();
+        let mut entries = Vec::new();
+        for (terminal_view_id, session) in sessions.sessions() {
+            // Warp's own TUI is the native agent, not a CLI agent row.
+            if session.agent == CLIAgent::WarpTui {
+                continue;
+            }
+            if let Some(session_id) = session
+                .session_context
+                .session_id
+                .as_deref()
+                .and_then(|id| id.parse::<uuid::Uuid>().ok())
+            {
+                live_session_ids.insert(session_id);
+            }
+            entries.push(self.cli_session_entry(terminal_view_id, session, app));
+        }
+        entries.extend(
+            self.cli_agents
+                .history
+                .iter()
+                .filter(|history| !live_session_ids.contains(&history.session_id))
+                .map(|history| cli_agents::entry_for_claude_history(history, app)),
+        );
+        entries
+    }
+
+    fn cli_session_entry(
+        &self,
+        terminal_view_id: EntityId,
+        session: &CLIAgentSession,
+        app: &AppContext,
+    ) -> AgentConversationEntry {
+        let task = app
+            .has_singleton_model::<TaskSessionsModel>()
+            .then(|| TaskSessionsModel::as_ref(app).get(terminal_view_id))
+            .flatten();
+        let last_updated = self
+            .cli_agents
+            .activity
+            .get(&terminal_view_id)
+            .copied()
+            .unwrap_or_default();
+        cli_agents::entry_for_cli_session(terminal_view_id, session, task, last_updated, app)
     }
 
     /// Called when a view that consumes this model's data becomes hidden.
@@ -1422,6 +1575,7 @@ impl AgentConversationsModel {
             ));
         }
 
+        entries.extend(self.cli_agent_entries(app));
         entries
     }
 
@@ -1456,6 +1610,15 @@ impl AgentConversationsModel {
                             )
                         })
                 }),
+            AgentConversationEntryId::CliSession(terminal_view_id) => cli_agent_sessions(app)?
+                .session(*terminal_view_id)
+                .map(|session| self.cli_session_entry(*terminal_view_id, session, app)),
+            AgentConversationEntryId::ClaudeHistory(session_id) => self
+                .cli_agents
+                .history
+                .iter()
+                .find(|history| history.session_id == *session_id)
+                .map(|history| cli_agents::entry_for_claude_history(history, app)),
         }
     }
 
@@ -1503,6 +1666,22 @@ impl AgentConversationsModel {
         restore_layout: Option<RestoreConversationLayout>,
         app: &AppContext,
     ) -> Option<WorkspaceAction> {
+        match entry.id {
+            AgentConversationEntryId::CliSession(terminal_view_id) => {
+                return Some(WorkspaceAction::FocusTerminalViewInWorkspace { terminal_view_id });
+            }
+            AgentConversationEntryId::ClaudeHistory(session_id) => {
+                return entry.display.working_directory.as_ref().map(|cwd| {
+                    WorkspaceAction::ResumeClaudeSession {
+                        cwd: PathBuf::from(cwd),
+                        session_id,
+                    }
+                });
+            }
+            AgentConversationEntryId::AmbientRun(_) | AgentConversationEntryId::Conversation(_) => {
+            }
+        }
+
         let active_views_model = ActiveAgentViewsModel::as_ref(app);
 
         if let Some(task_id) = entry.identity.ambient_agent_task_id {
@@ -2209,6 +2388,12 @@ impl AgentConversationsModel {
         self.dirty_since = None;
         self.initial_load_state = InitialConversationLoadState::WaitingForCloud;
     }
+}
+
+/// The CLI agent sessions model, when registered (minimal test harnesses omit it).
+fn cli_agent_sessions(app: &AppContext) -> Option<&CLIAgentSessionsModel> {
+    app.has_singleton_model::<CLIAgentSessionsModel>()
+        .then(|| CLIAgentSessionsModel::as_ref(app))
 }
 
 #[cfg(test)]

@@ -20,6 +20,8 @@ use std::path::PathBuf;
 use warp_core::features::FeatureFlag;
 
 use self::claude::ClaudeTranscript;
+#[cfg(not(target_family = "wasm"))]
+pub(crate) use self::claude::read_session_title;
 pub(crate) use self::settings::*;
 use self::source::CliTranscriptSource;
 pub(crate) use self::view::{CliChatView, CliChatViewEvent};

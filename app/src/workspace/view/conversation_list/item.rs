@@ -61,6 +61,12 @@ fn conversation_item_position_id(id: &AgentConversationEntryId) -> String {
         AgentConversationEntryId::AmbientRun(task_id) => {
             format!("conversation_list_task_{task_id}")
         }
+        AgentConversationEntryId::CliSession(terminal_view_id) => {
+            format!("conversation_list_cli_{terminal_view_id}")
+        }
+        AgentConversationEntryId::ClaudeHistory(session_id) => {
+            format!("conversation_list_claude_{session_id}")
+        }
     }
 }
 

@@ -6794,6 +6794,12 @@ impl Workspace {
                     }
                 }
             }
+            // Fork: without Warp AI, new conversations are Claude Code sessions.
+            LeftPanelEvent::NewConversationInNewTab
+                if !AISettings::as_ref(ctx).is_any_ai_enabled(ctx) =>
+            {
+                self.open_claude_code_tab(ctx);
+            }
             LeftPanelEvent::NewConversationInNewTab => {
                 self.add_terminal_tab_with_new_agent_view(ctx);
             }
@@ -25199,10 +25205,9 @@ impl TypedActionView for Workspace {
                 );
                 ctx.notify();
             }
+            // Fork: the dashboard lists CLI agent sessions, so it no longer needs Warp AI.
             ToggleAgentManagementView => {
-                if AISettings::as_ref(ctx).is_any_ai_enabled(ctx)
-                    && FeatureFlag::AgentManagementView.is_enabled()
-                {
+                if FeatureFlag::AgentManagementView.is_enabled() {
                     let is_open = !self.current_workspace_state.is_agent_management_view_open;
                     self.set_is_agent_management_view_open(is_open, ctx);
 
@@ -25221,9 +25226,7 @@ impl TypedActionView for Workspace {
                 }
             }
             OpenAgentManagementView => {
-                if AISettings::as_ref(ctx).is_any_ai_enabled(ctx)
-                    && FeatureFlag::AgentManagementView.is_enabled()
-                {
+                if FeatureFlag::AgentManagementView.is_enabled() {
                     self.set_is_agent_management_view_open(true, ctx);
                     ctx.focus(&self.agent_management_view);
                     ctx.notify();

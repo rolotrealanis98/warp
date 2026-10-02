@@ -1533,7 +1533,8 @@ pub fn init(app: &mut AppContext) {
     )
     .with_enabled(|| FeatureFlag::AgentManagementView.is_enabled())
     .with_custom_action(CustomAction::OpenAgentDashboard)
-    .with_context_predicate(id!("Workspace") & id!(flags::IS_ANY_AI_ENABLED))
+    // Fork: available without Warp AI; the dashboard lists CLI agent sessions.
+    .with_context_predicate(id!("Workspace"))
     .with_mac_key_binding("cmd-shift-M")
     .with_linux_or_windows_key_binding("ctrl-shift-M")
     .with_group(bindings::BindingGroup::WarpAi.as_str())]);

@@ -48,13 +48,20 @@ pub enum ConversationOrTaskId {
     TaskId(AmbientAgentTaskId),
 }
 
-impl From<AgentConversationEntryId> for ConversationOrTaskId {
-    fn from(id: AgentConversationEntryId) -> Self {
+impl TryFrom<AgentConversationEntryId> for ConversationOrTaskId {
+    /// CLI agent sessions are neither.
+    type Error = ();
+
+    fn try_from(id: AgentConversationEntryId) -> Result<Self, ()> {
         match id {
             AgentConversationEntryId::Conversation(conversation_id) => {
-                ConversationOrTaskId::ConversationId(conversation_id)
+                Ok(ConversationOrTaskId::ConversationId(conversation_id))
             }
-            AgentConversationEntryId::AmbientRun(task_id) => ConversationOrTaskId::TaskId(task_id),
+            AgentConversationEntryId::AmbientRun(task_id) => {
+                Ok(ConversationOrTaskId::TaskId(task_id))
+            }
+            AgentConversationEntryId::CliSession(_)
+            | AgentConversationEntryId::ClaudeHistory(_) => Err(()),
         }
     }
 }
@@ -521,6 +528,9 @@ impl ActiveAgentViewsModel {
         entry: &AgentConversationEntry,
         ctx: &AppContext,
     ) -> Option<EntityId> {
+        if let AgentConversationEntryId::CliSession(terminal_view_id) = entry.id {
+            return Some(terminal_view_id);
+        }
         if let Some(task_id) = entry.identity.ambient_agent_task_id
             && let Some(terminal_view_id) = self.get_terminal_view_id_for_ambient_task(task_id)
         {

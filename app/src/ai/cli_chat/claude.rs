@@ -271,6 +271,58 @@ pub(crate) fn parse_records(bytes: &[u8]) -> Vec<ChatEvent> {
     events
 }
 
+/// Bytes read from each end of a transcript when titling it.
+#[cfg(not(target_family = "wasm"))]
+const TITLE_SCAN_BYTES: u64 = 256 * 1024;
+
+/// The title of a stored session: its latest custom title, else its latest generated title,
+/// else the first line of its first prompt. `None` for a session without a prompt.
+///
+/// Claude Code re-appends title records throughout a session, so the file's last bytes
+/// usually hold the current title and its first bytes the first prompt.
+// ponytail: reads at most 2 x TITLE_SCAN_BYTES per file; a title written only in the middle of
+// a larger transcript is missed and the first prompt stands in.
+#[cfg(not(target_family = "wasm"))]
+pub(crate) fn read_session_title(path: &Path) -> Option<String> {
+    let len = fs::metadata(path).ok()?.len();
+    let head = read_from(path, 0, TITLE_SCAN_BYTES).ok()?;
+    let tail = match len.checked_sub(TITLE_SCAN_BYTES) {
+        Some(start) if start > 0 => read_from(path, start, TITLE_SCAN_BYTES).ok()?,
+        _ => Vec::new(),
+    };
+    session_title(&head, &tail)
+}
+
+/// [`read_session_title`] over a transcript's first and last bytes. The partial lines at the
+/// cut points do not parse and are skipped.
+#[cfg(not(target_family = "wasm"))]
+fn session_title(head: &[u8], tail: &[u8]) -> Option<String> {
+    let (mut custom, mut generated, mut first_prompt) = (None, None, None);
+    for event in parse_records(head).into_iter().chain(parse_records(tail)) {
+        match event {
+            ChatEvent::Title {
+                text,
+                is_custom: true,
+            } => custom = Some(text),
+            ChatEvent::Title {
+                text,
+                is_custom: false,
+            } => generated = Some(text),
+            ChatEvent::UserMessage { text, .. } if first_prompt.is_none() => {
+                first_prompt = Some(text);
+            }
+            _ => {}
+        }
+    }
+    custom
+        .or(generated)
+        .or(first_prompt)?
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .map(str::to_owned)
+}
+
 fn push_record_events(record: Record, events: &mut Vec<ChatEvent>) {
     let at = record
         .timestamp

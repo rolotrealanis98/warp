@@ -7,7 +7,9 @@ use warpui::elements::ChildView;
 use warpui::{Element, Entity, ModelHandle, SingletonEntity, View, ViewContext, ViewHandle};
 
 use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
-use crate::ai::agent_conversations_model::AgentConversationEntryId;
+use crate::ai::agent_conversations_model::{
+    AgentConversationEntryId, AgentConversationsModel, AgentConversationsModelEvent,
+};
 use crate::ai::blocklist::agent_view::AgentViewController;
 use crate::ai::blocklist::conversation_selection::ConversationSelectionHandle;
 use crate::features::FeatureFlag;
@@ -153,6 +155,21 @@ impl InlineConversationMenuView {
             }
         });
 
+        // Rows can arrive after the menu opens (e.g. past CLI agent sessions read from disk).
+        ctx.subscribe_to_model(
+            &AgentConversationsModel::handle(ctx),
+            |me, _, event, ctx| {
+                if matches!(event, AgentConversationsModelEvent::ConversationsLoaded)
+                    && me
+                        .input_suggestions_model
+                        .as_ref(ctx)
+                        .is_conversation_menu()
+                {
+                    me.rerun_query(ctx);
+                }
+            },
+        );
+
         let active_agent_views_model = ActiveAgentViewsModel::handle(ctx);
         ctx.subscribe_to_model(&active_agent_views_model, |me, _, _, ctx| {
             if me
@@ -196,6 +213,17 @@ impl InlineConversationMenuView {
 
     pub fn select_next_tab(&self, ctx: &mut ViewContext<Self>) -> bool {
         self.menu_view.update(ctx, |v, ctx| v.select_next_tab(ctx))
+    }
+
+    /// Shows the conversations from the session's current directory, when that tab exists.
+    pub fn select_current_directory_tab(&self, ctx: &mut ViewContext<Self>) {
+        if let Some(index) = TAB_CONFIGS
+            .iter()
+            .position(|config| config.id == InlineConversationMenuTab::CurrentDirectory)
+        {
+            self.menu_view
+                .update(ctx, |v, ctx| v.set_active_tab(index, ctx));
+        }
     }
 
     pub fn select_up(&self, ctx: &mut ViewContext<Self>) {

@@ -351,3 +351,78 @@ fn reported_transcript_path_is_used_when_it_names_the_session() {
 
     assert_eq!(located, Some(path));
 }
+
+#[test]
+fn session_title_uses_latest_generated_title() {
+    let head = concat!(
+        r#"{"type":"user","message":{"role":"user","content":"Add a greeting"}}"#,
+        "\n",
+        r#"{"type":"ai-title","aiTitle":"Greeting draft"}"#,
+        "\n",
+    );
+    let tail = concat!(
+        r#"{"type":"ai-title","aiTitle":"Add greeting banner"}"#,
+        "\n"
+    );
+
+    let title = session_title(head.as_bytes(), tail.as_bytes());
+
+    assert_eq!(title.as_deref(), Some("Add greeting banner"));
+}
+
+#[test]
+fn session_title_prefers_custom_title_over_generated() {
+    let head = concat!(
+        r#"{"type":"custom-title","customTitle":"EXAMPLE-123 greeting"}"#,
+        "\n",
+        r#"{"type":"ai-title","aiTitle":"Add greeting banner"}"#,
+        "\n",
+    );
+
+    let title = session_title(head.as_bytes(), b"");
+
+    assert_eq!(title.as_deref(), Some("EXAMPLE-123 greeting"));
+}
+
+#[test]
+fn session_title_falls_back_to_first_line_of_first_prompt() {
+    let head = concat!(
+        r#"{"type":"user","isMeta":true,"message":{"role":"user","content":"Caveat: meta"}}"#,
+        "\n",
+        r#"{"type":"user","message":{"role":"user","content":"\n  Fix the build\nIt fails on CI."}}"#,
+        "\n",
+        r#"{"type":"user","message":{"role":"user","content":"Also run the tests"}}"#,
+        "\n",
+    );
+
+    let title = session_title(head.as_bytes(), b"");
+
+    assert_eq!(title.as_deref(), Some("Fix the build"));
+}
+
+#[test]
+fn session_title_is_none_without_a_prompt() {
+    let head = concat!(
+        r#"{"type":"file-history-snapshot","snapshot":{}}"#,
+        "\n",
+        r#"{"type":"user","isMeta":true,"message":{"role":"user","content":"Caveat: meta"}}"#,
+        "\n",
+    );
+
+    assert_eq!(session_title(head.as_bytes(), b""), None);
+}
+
+#[test]
+fn read_session_title_reads_the_end_of_a_long_transcript() {
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, r#"{{"type":"ai-title","aiTitle":"Early title"}}"#).unwrap();
+    let filler = format!(r#"{{"type":"progress","data":"{}"}}"#, "x".repeat(1024));
+    for _ in 0..600 {
+        writeln!(file, "{filler}").unwrap();
+    }
+    writeln!(file, r#"{{"type":"ai-title","aiTitle":"Current title"}}"#).unwrap();
+
+    let title = read_session_title(file.path());
+
+    assert_eq!(title.as_deref(), Some("Current title"));
+}

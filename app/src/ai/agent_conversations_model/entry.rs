@@ -1,8 +1,9 @@
 use chrono::{DateTime, Utc};
 use session_sharing_protocol::common::SessionId;
+use uuid::Uuid;
 use warp_cli::agent::Harness;
 use warp_core::features::FeatureFlag;
-use warpui::{AppContext, SingletonEntity};
+use warpui::{AppContext, EntityId, SingletonEntity};
 
 use super::{
     AgentManagementFilters, AgentRunDisplayStatus, ArtifactFilter, ConversationMetadata,
@@ -35,6 +36,10 @@ const SESSION_EXPIRATION_TIME: chrono::Duration = chrono::Duration::weeks(1);
 pub enum AgentConversationEntryId {
     AmbientRun(AmbientAgentTaskId),
     Conversation(AIConversationId),
+    /// Fork: a CLI agent running in a terminal pane, keyed by the terminal view id.
+    CliSession(EntityId),
+    /// Fork: a past Claude Code session on disk, keyed by its session id.
+    ClaudeHistory(Uuid),
 }
 
 impl AgentConversationEntryId {
@@ -42,6 +47,8 @@ impl AgentConversationEntryId {
         match self {
             AgentConversationEntryId::AmbientRun(id) => format!("task_{id}"),
             AgentConversationEntryId::Conversation(id) => format!("conv_{id}"),
+            AgentConversationEntryId::CliSession(id) => format!("cli_{id}"),
+            AgentConversationEntryId::ClaudeHistory(id) => format!("claude_{id}"),
         }
     }
 }
@@ -328,11 +335,11 @@ pub(super) fn task_creator_uid(task: &AmbientAgentTask) -> Option<String> {
     task.creator.as_ref().map(|creator| creator.uid.clone())
 }
 
-fn current_user_name(app: &AppContext) -> Option<String> {
+pub(super) fn current_user_name(app: &AppContext) -> Option<String> {
     AuthStateProvider::as_ref(app).get().username_for_display()
 }
 
-fn current_user_uid(app: &AppContext) -> Option<String> {
+pub(super) fn current_user_uid(app: &AppContext) -> Option<String> {
     AuthStateProvider::as_ref(app)
         .get()
         .user_id()

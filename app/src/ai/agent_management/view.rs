@@ -1217,6 +1217,8 @@ impl AgentManagementView {
                             ctx
                         );
                     }
+                    ManagementCardItemId::CliSession(_)
+                    | ManagementCardItemId::ClaudeHistory(_) => {}
                 }
 
                 ctx.clipboard()
@@ -2405,6 +2407,11 @@ impl TypedActionView for AgentManagementView {
                 ctx.notify();
             }
             AgentManagementViewAction::ShowAgentTypeSelector => {
+                // Fork: without Warp AI, a new agent is a CLI agent started on a task.
+                if !AISettings::as_ref(ctx).is_any_ai_enabled(ctx) {
+                    ctx.dispatch_typed_action(&WorkspaceAction::OpenTaskAgentModal);
+                    return;
+                }
                 send_telemetry_from_ctx!(
                     AgentManagementTelemetryEvent::AgentTypeSelectorOpened,
                     ctx
@@ -2441,6 +2448,8 @@ impl TypedActionView for AgentManagementView {
                             ctx
                         );
                     }
+                    ManagementCardItemId::CliSession(_)
+                    | ManagementCardItemId::ClaudeHistory(_) => {}
                 }
                 ctx.dispatch_typed_action(&action);
             }

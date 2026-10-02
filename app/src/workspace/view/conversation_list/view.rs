@@ -357,7 +357,8 @@ impl ConversationListView {
                 .and_then(|entry| entry.identity.local_conversation_id)
                 .map(AgentConversationEntryId::Conversation);
             let is_active = active_ids.contains(&entry.id)
-                || local_conversation_entry_id.is_some_and(|id| active_ids.contains(&id));
+                || local_conversation_entry_id.is_some_and(|id| active_ids.contains(&id))
+                || matches!(entry.id, AgentConversationEntryId::CliSession(_));
             if is_active {
                 active_items.push(ListItem::Conversation {
                     entry: entry.clone(),
@@ -393,8 +394,9 @@ impl ConversationListView {
         active_items.sort_by(|a, b| {
             let get_time = |item: &ListItem| match item {
                 ListItem::Conversation { entry, .. } => {
-                    let entry_time = active_views_model
-                        .get_last_opened_time(&ConversationOrTaskId::from(entry.id));
+                    let entry_time = ConversationOrTaskId::try_from(entry.id)
+                        .ok()
+                        .and_then(|id| active_views_model.get_last_opened_time(&id));
                     let local_time = model
                         .get_item_by_id(&entry.id, ctx)
                         .and_then(|item| item.identity.local_conversation_id)
@@ -639,6 +641,8 @@ impl ConversationListView {
                     ctx
                 );
             }
+            AgentConversationEntryId::CliSession(_)
+            | AgentConversationEntryId::ClaudeHistory(_) => {}
         }
     }
 
@@ -797,7 +801,7 @@ fn render_zero_state(
         .with_cross_axis_alignment(CrossAxisAlignment::Center)
         .with_spacing(4.)
         .with_child(
-            Text::new("No conversations yet", appearance.ui_font_family(), 14.)
+            Text::new("No agent sessions yet", appearance.ui_font_family(), 14.)
                 .with_color(theme.sub_text_color(theme.background()).into_solid())
                 .with_style(Properties::default().weight(Weight::Semibold))
                 .finish(),
@@ -805,7 +809,7 @@ fn render_zero_state(
         .with_child(
             ConstrainedBox::new(
                 FormattedTextElement::from_str(
-                    "Your active and past conversations with local and ambient agents will appear here.",
+                    "Your running and past Claude Code sessions will appear here.",
                     appearance.ui_font_family(),
                     14.,
                 )
@@ -820,7 +824,7 @@ fn render_zero_state(
 
     let new_conversation_button =
         Hoverable::new(zero_state_button_mouse_state, move |mouse_state| {
-            let label = Text::new_inline("New conversation", appearance.ui_font_family(), 12.)
+            let label = Text::new_inline("New Claude Code tab", appearance.ui_font_family(), 12.)
                 .with_color(theme.main_text_color(theme.background()).into_solid())
                 .finish();
 
