@@ -149,6 +149,7 @@ const ALL_SECTIONS: &[SettingsSection] = &[
     SettingsSection::EditorAndCodeReview,
     SettingsSection::CloudEnvironments,
     SettingsSection::WarpCloudAgentAPIKeys,
+    SettingsSection::PrStack,
 ];
 
 /// Sections whose user-facing Display label has deliberately diverged from the
@@ -183,7 +184,8 @@ fn all_sections_list_is_exhaustive() {
             | SettingsSection::CodeIndexing
             | SettingsSection::EditorAndCodeReview
             | SettingsSection::CloudEnvironments
-            | SettingsSection::WarpCloudAgentAPIKeys => section,
+            | SettingsSection::WarpCloudAgentAPIKeys
+            | SettingsSection::PrStack => section,
         };
         ALL_SECTIONS.contains(&known)
     }

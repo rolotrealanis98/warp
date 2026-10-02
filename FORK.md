@@ -87,6 +87,32 @@ cargo build -p warp --no-default-features --features "<upstream default list>"
 
 or disable a single feature by removing it from `fork_features` in `app/Cargo.toml`.
 
+## PR stack view
+
+Left panel > branch icon. Shows the stack under the focused terminal's repo:
+the checked-out branch and the local branches below it down to the target
+(origin default branch unless overridden), inferred from git ancestry.
+
+- Row click: code review panel diffed against the branch's parent (the
+  branch must be checked out in some worktree).
+- Right click: Create PR, Open PR, Sync, Restack from here, pins, copy name.
+- Create PR reads the title (first line) and body from `pr_body_file_template`
+  (default `.git/warp-pr/{{branch}}.md`). If missing and `pr_prepare_command`
+  is set, that text is sent to the branch's agent pane and Warp waits for the
+  agent to stop; otherwise a template from the commit messages is used. A
+  stack footer is kept up to date in every open PR of the stack.
+- Restacks rebase with `git rebase --onto`, force-push (with lease) branches
+  that have PRs, and retarget a PR whose parent merged. Conflicts stop the run
+  and the hand-off is sent to the agent pane; nothing is resolved by Warp.
+- State lives in `.git/warp-stack.json` (untracked): `target`, `pins`
+  (child -> parent), and the last known `parents`.
+
+Settings (`[pr_stack]` in the settings file, most also on Settings > PR stack):
+`targets` (repo root path -> target branch), `classification` (ordered
+`{ pattern, bucket }` rules, bucket = tests | docs | config),
+`pr_body_file_template`, `pr_prepare_command`, `auto_restack`,
+`poll_interval_secs`, `row_order`.
+
 ## Warp's own agent
 
 Warp's native agent, Active AI and related UI are controlled by the existing

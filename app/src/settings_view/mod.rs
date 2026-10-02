@@ -17,6 +17,7 @@ use main_page::{MainPageAction, MainSettingsPageEvent, MainSettingsPageView};
 use mcp_servers_page::MCPServersSettingsPageView;
 use nav::{SettingsNavItem, SettingsUmbrella};
 use pathfinder_geometry::vector::Vector2F;
+use pr_stack_page::PrStackPageView;
 use privacy_page::{PrivacyPageView, PrivacyPageViewEvent};
 use referrals_page::{ReferralsPageEvent, ReferralsPageView};
 use scripting_page::ScriptingSettingsPageView;
@@ -108,6 +109,7 @@ mod nav;
 pub mod pane_manager;
 mod platform;
 mod platform_page;
+mod pr_stack_page;
 mod privacy;
 mod privacy_page;
 mod referrals_page;
@@ -339,6 +341,8 @@ pub enum SettingsSection {
     // ── Cloud platform umbrella subpages ──
     CloudEnvironments,
     WarpCloudAgentAPIKeys,
+    // ── Fork pages ──
+    PrStack,
 }
 
 use std::fmt::{self, Display};
@@ -363,6 +367,7 @@ impl Display for SettingsSection {
             SettingsSection::EditorAndCodeReview => write!(f, "Editor and Code Review"),
             SettingsSection::CloudEnvironments => write!(f, "Environments"),
             SettingsSection::WarpCloudAgentAPIKeys => write!(f, "API keys"),
+            SettingsSection::PrStack => write!(f, "PR stack"),
             _ => write!(f, "{self:?}"),
         }
     }
@@ -409,6 +414,7 @@ impl SettingsSection {
             // Keeps the "Oz" spelling the slug was seeded from; only the
             // Display label above dropped it.
             Self::WarpCloudAgentAPIKeys => "Oz Cloud API Keys",
+            Self::PrStack => "PR stack",
         }
     }
 
@@ -448,6 +454,7 @@ impl SettingsSection {
             "Editor and Code Review" | "EditorAndCodeReview" => Self::EditorAndCodeReview,
             "Environments" | "CloudEnvironments" => Self::CloudEnvironments,
             "Oz Cloud API Keys" | "OzCloudAPIKeys" => Self::WarpCloudAgentAPIKeys,
+            "PR stack" | "PrStack" => Self::PrStack,
             _ => return None,
         };
         Some(section)
@@ -1172,6 +1179,7 @@ macro_rules! update_page {
             SettingsPageViewHandle::MCPServers(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::WarpDrive(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::TaskAgents(handle) => $ctx.update_view(handle, $update),
+            SettingsPageViewHandle::PrStack(handle) => $ctx.update_view(handle, $update),
         }
     };
 }
@@ -1332,6 +1340,10 @@ impl SettingsView {
             None
         };
 
+        let pr_stack_page_handle = FeatureFlag::PrStackView
+            .is_enabled()
+            .then(|| ctx.add_typed_action_view(PrStackPageView::new));
+
         // Warp Drive page
         let warp_drive_page_handle =
             ctx.add_typed_action_view(warp_drive_page::WarpDriveSettingsPageView::new);
@@ -1406,6 +1418,9 @@ impl SettingsView {
                 ctx.add_typed_action_view(TaskAgentsPageView::new),
             ));
         }
+        if let Some(pr_stack_page_handle) = pr_stack_page_handle {
+            settings_pages.push(SettingsPage::new(pr_stack_page_handle));
+        }
 
         settings_pages.extend(vec![
             SettingsPage::new(mcp_servers_page_handle),
@@ -1469,8 +1484,22 @@ impl SettingsView {
             );
         }
 
+        if FeatureFlag::PrStackView.is_enabled() {
+            let privacy_index = nav_items
+                .iter()
+                .position(|item| matches!(item, SettingsNavItem::Page(SettingsSection::Privacy)))
+                .unwrap_or(nav_items.len());
+            nav_items.insert(
+                privacy_index,
+                SettingsNavItem::Page(SettingsSection::PrStack),
+            );
+        }
+
         let initial_page = match page {
             Some(SettingsSection::Scripting) if !FeatureFlag::WarpControlCli.is_enabled() => {
+                SettingsSection::Account
+            }
+            Some(SettingsSection::PrStack) if !FeatureFlag::PrStackView.is_enabled() => {
                 SettingsSection::Account
             }
             other => other.unwrap_or_default(),
@@ -2148,6 +2177,7 @@ impl SettingsView {
             SettingsPageViewHandle::EditorAndCodeReview(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::WarpDrive(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::TaskAgents(v) => v.as_ref(app).should_render(app),
+            SettingsPageViewHandle::PrStack(v) => v.as_ref(app).should_render(app),
         }
     }
 
