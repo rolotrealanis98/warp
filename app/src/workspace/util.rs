@@ -119,6 +119,7 @@ pub struct WorkspaceState {
     pub is_tab_config_params_modal_open: bool,
     pub is_session_config_modal_open: bool,
     pub is_new_worktree_modal_open: bool,
+    pub is_task_agent_modal_open: bool,
     pub is_remove_tab_config_dialog_open: bool,
     /// Whether the transcript details panel is open (WASM only, for conversation transcript viewing).
     pub is_transcript_details_panel_open: bool,
@@ -162,6 +163,7 @@ impl WorkspaceState {
             || self.is_tab_config_params_modal_open
             || self.is_session_config_modal_open
             || self.is_new_worktree_modal_open
+            || self.is_task_agent_modal_open
             || self.is_remove_tab_config_dialog_open
             || {
                 let one_time_modal = OneTimeModalModel::as_ref(app);
@@ -206,6 +208,7 @@ impl WorkspaceState {
         self.is_tab_config_params_modal_open = false;
         self.is_session_config_modal_open = false;
         self.is_new_worktree_modal_open = false;
+        self.is_task_agent_modal_open = false;
         self.is_remove_tab_config_dialog_open = false;
     }
 

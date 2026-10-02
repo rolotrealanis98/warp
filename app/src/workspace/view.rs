@@ -18,6 +18,7 @@ pub(crate) mod orchestration_launch_modal;
 pub(crate) mod right_panel;
 mod startup_directory;
 mod tab_grouping;
+mod task_agent;
 #[cfg(test)]
 #[path = "view_tests.rs"]
 pub(crate) mod tests;
@@ -1114,6 +1115,7 @@ pub struct Workspace {
         Option<PendingSessionConfigTabConfigChipTutorial>,
     onboarding_tutorial_deferred_by_modal: Option<DeferredOnboardingTutorial>,
     new_worktree_modal: ModalViewState<Modal<NewWorktreeModal>>,
+    task_agent_modal: ModalViewState<Modal<crate::task_agent::TaskAgentModal>>,
     close_session_confirmation_dialog: ViewHandle<CloseSessionConfirmationDialog>,
     rewind_confirmation_dialog: ViewHandle<RewindConfirmationDialog>,
     delete_conversation_confirmation_dialog: ViewHandle<DeleteConversationConfirmationDialog>,
@@ -3094,6 +3096,7 @@ impl Workspace {
 
         let tab_config_params_modal = Self::build_tab_config_params_modal(ctx);
         let new_worktree_modal = Self::build_new_worktree_modal(ctx);
+        let task_agent_modal = Self::build_task_agent_modal(ctx);
 
         let session_config_modal = Self::build_session_config_modal(ctx);
 
@@ -3498,6 +3501,7 @@ impl Workspace {
             pending_session_config_tab_config_chip_tutorial: None,
             onboarding_tutorial_deferred_by_modal: None,
             new_worktree_modal,
+            task_agent_modal,
             close_session_confirmation_dialog,
             rewind_confirmation_dialog,
             delete_conversation_confirmation_dialog,
@@ -24366,6 +24370,14 @@ impl TypedActionView for Workspace {
             OpenNewWorktreeRepoPicker => {
                 self.open_repo_picker_for_new_worktree_modal(ctx);
             }
+            OpenTaskAgentModal => self.open_task_agent_modal_for_active_session(
+                crate::task_agent::TaskAgentModalMode::Launch,
+                ctx,
+            ),
+            RenameSessionFromTask => self.open_task_agent_modal_for_active_session(
+                crate::task_agent::TaskAgentModalMode::Rename,
+                ctx,
+            ),
             OpenTabConfigErrorFile {
                 #[cfg_attr(not(feature = "local_fs"), allow(unused_variables))]
                 path,
@@ -27583,6 +27595,10 @@ impl View for Workspace {
 
         if self.new_worktree_modal.is_open() {
             stack.add_child(self.new_worktree_modal.render());
+        }
+
+        if self.task_agent_modal.is_open() {
+            stack.add_child(self.task_agent_modal.render());
         }
 
         if self.workflow_modal.as_ref(app).is_open() {

@@ -838,6 +838,10 @@ pub enum WorkspaceAction {
     OpenNewWorktreeModal,
     /// Open the native folder picker for the repo field in the new-worktree modal.
     OpenNewWorktreeRepoPicker,
+    /// Open the task agent launcher for the active session's repository.
+    OpenTaskAgentModal,
+    /// Name the active session after a task (key + title) without launching anything.
+    RenameSessionFromTask,
     /// Create a new worktree in the given repo using the default worktree tab config.
     /// The branch name is auto-generated.
     OpenWorktreeInRepo {
@@ -1107,6 +1111,8 @@ impl WorkspaceAction {
             | OpenTabConfigRepoPicker { .. }
             | OpenNewWorktreeModal
             | OpenNewWorktreeRepoPicker
+            | OpenTaskAgentModal
+            | RenameSessionFromTask
             | OpenWorktreeInRepo { .. }
             | OpenWorktreeAddRepoPicker
             | Crash
