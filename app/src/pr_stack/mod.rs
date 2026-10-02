@@ -2,6 +2,7 @@
 //! repo, with stack-relative stats, PR status, PR creation and restacking.
 //! Gated by `FeatureFlag::PrStackView`.
 
+pub mod panel;
 pub mod restack;
 pub mod settings;
 pub mod stack;
@@ -9,4 +10,5 @@ pub mod stats;
 pub mod status;
 pub mod submit;
 
+pub use panel::{PrStackPanel, PrStackPanelEvent};
 pub use settings::PrStackSettings;

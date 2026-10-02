@@ -40,6 +40,7 @@ use crate::pane_group::working_directories::WorkingDirectory;
 use crate::pane_group::{
     PaneGroup, WorkingDirectoriesEvent, WorkingDirectoriesModel, {self},
 };
+use crate::pr_stack::{PrStackPanel, PrStackPanelEvent};
 #[cfg(feature = "local_fs")]
 use crate::server::telemetry::CodePanelsFileOpenEntrypoint;
 use crate::server::telemetry::{FileTreeSource, WarpDriveSource};
@@ -77,6 +78,7 @@ struct MouseStateHandles {
     conversation_list_view_button: MouseStateHandle,
     global_search_button: MouseStateHandle,
     warp_drive_button: MouseStateHandle,
+    pr_stack_button: MouseStateHandle,
     sign_in_button: MouseStateHandle,
 }
 
@@ -86,6 +88,7 @@ pub enum LeftPanelAction {
     GlobalSearch { entry_focus: GlobalSearchEntryFocus },
     WarpDrive,
     ConversationListView,
+    PrStack,
     SignIn,
 }
 
@@ -99,9 +102,9 @@ pub(crate) enum ToolPanelAvailability {
 impl ToolPanelView {
     fn availability(self, app: &AppContext) -> ToolPanelAvailability {
         match self {
-            ToolPanelView::ProjectExplorer | ToolPanelView::GlobalSearch { .. } => {
-                ToolPanelAvailability::Available
-            }
+            ToolPanelView::ProjectExplorer
+            | ToolPanelView::GlobalSearch { .. }
+            | ToolPanelView::PrStack => ToolPanelAvailability::Available,
             ToolPanelView::WarpDrive => {
                 if WarpDriveSettings::is_warp_drive_available(app) {
                     ToolPanelAvailability::Available
@@ -143,6 +146,11 @@ pub enum LeftPanelEvent {
         terminal_view_id: Option<warpui::EntityId>,
     },
     SignInRequested,
+    /// Show a stack branch's changes against its parent in code review.
+    OpenPrStackDiff {
+        repo: PathBuf,
+        base: String,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -151,6 +159,7 @@ pub enum ToolPanelView {
     GlobalSearch { entry_focus: GlobalSearchEntryFocus },
     WarpDrive,
     ConversationListView,
+    PrStack,
 }
 
 /// Encapsulates the active view state to enforce that all mutations go through
@@ -191,6 +200,7 @@ mod active_view_state {
         }
 
         left_panel.update_active_file_tree_subscription_state(ctx);
+        left_panel.update_pr_stack_active_state(ctx);
     }
 }
 
@@ -218,6 +228,7 @@ pub struct LeftPanelView {
     close_button_mouse_state: MouseStateHandle,
     warp_drive_view: ViewHandle<DrivePanel>,
     conversation_list_view: ViewHandle<ConversationListView>,
+    pr_stack_view: ViewHandle<PrStackPanel>,
     active_view: active_view_state::ActiveViewState,
     toolbelt_buttons: Vec<ToolbeltButtonConfig>,
     active_pane_group: Option<WeakViewHandle<PaneGroup>>,
@@ -270,11 +281,14 @@ impl LeftPanelView {
             (
                 ToolPanelView::ProjectExplorer
                 | ToolPanelView::GlobalSearch { .. }
-                | ToolPanelView::WarpDrive,
+                | ToolPanelView::WarpDrive
+                | ToolPanelView::PrStack,
                 ToolPanelAvailability::RequiresAi,
             )
             | (
-                ToolPanelView::ProjectExplorer | ToolPanelView::GlobalSearch { .. },
+                ToolPanelView::ProjectExplorer
+                | ToolPanelView::GlobalSearch { .. }
+                | ToolPanelView::PrStack,
                 ToolPanelAvailability::RequiresAccount,
             )
             | (_, ToolPanelAvailability::Available) => {
@@ -353,6 +367,16 @@ impl LeftPanelView {
         };
         let warp_drive_view = ctx.add_typed_action_view(DrivePanel::new);
         let conversation_list_view = ctx.add_typed_action_view(ConversationListView::new);
+        let pr_stack_view =
+            ctx.add_typed_action_view(|ctx| PrStackPanel::new(&working_directories_model, ctx));
+        ctx.subscribe_to_view(&pr_stack_view, |_me, _, event, ctx| match event {
+            PrStackPanelEvent::OpenDiff { repo, base } => {
+                ctx.emit(LeftPanelEvent::OpenPrStackDiff {
+                    repo: repo.clone(),
+                    base: base.clone(),
+                });
+            }
+        });
 
         ctx.subscribe_to_view(&warp_drive_view, |_me, _, event, ctx| {
             ctx.emit(LeftPanelEvent::WarpDrive(event.clone()));
@@ -468,6 +492,7 @@ impl LeftPanelView {
             close_button_mouse_state: Default::default(),
             warp_drive_view,
             conversation_list_view,
+            pr_stack_view,
             active_view: active_view_state::new(active_view),
             toolbelt_buttons,
             active_pane_group: None,
@@ -610,6 +635,15 @@ impl LeftPanelView {
                     tooltip_keybinding_names,
                 }
             }
+            ToolPanelView::PrStack => ToolbeltButtonConfig {
+                icon: Icon::GitBranch,
+                active_icon: None,
+                tooltip_text: "PR stack".to_string(),
+                action: LeftPanelAction::PrStack,
+                render_with_active_state: false,
+                tooltip_keybinding: None,
+                tooltip_keybinding_names: Vec::new(),
+            },
         }
     }
 
@@ -808,6 +842,9 @@ impl LeftPanelView {
             }
         });
 
+        self.pr_stack_view.update(ctx, |view, ctx| {
+            view.set_pane_group(&pane_group, ctx);
+        });
         self.on_left_panel_visibility_changed(left_panel_open, ctx);
 
         ctx.notify();
@@ -874,6 +911,7 @@ impl LeftPanelView {
                     view.on_left_panel_focused(ctx);
                 });
             }
+            ToolPanelView::PrStack => ctx.focus(&self.pr_stack_view),
         }
     }
 
@@ -1040,6 +1078,7 @@ impl LeftPanelView {
                 LeftPanelAction::ConversationListView => {
                     self.active_view.get() == ToolPanelView::ConversationListView
                 }
+                LeftPanelAction::PrStack => self.active_view.get() == ToolPanelView::PrStack,
                 LeftPanelAction::SignIn => false,
             };
         }
@@ -1186,6 +1225,9 @@ impl LeftPanelView {
                     send_telemetry_from_ctx!(TelemetryEvent::ConversationListViewOpened, ctx);
                 }
             }
+            LeftPanelAction::PrStack => {
+                active_view_state::set(self, ToolPanelView::PrStack, ctx);
+            }
             LeftPanelAction::SignIn => {
                 ctx.emit(LeftPanelEvent::SignInRequested);
             }
@@ -1198,6 +1240,20 @@ impl LeftPanelView {
         }
 
         self.update_active_file_tree_subscription_state(ctx);
+        self.update_pr_stack_active_state(ctx);
+    }
+
+    /// The PR stack only loads and polls while it is on screen.
+    fn update_pr_stack_active_state(&self, ctx: &mut ViewContext<Self>) {
+        let is_visible = self.active_view.get() == ToolPanelView::PrStack
+            && self
+                .active_pane_group
+                .as_ref()
+                .and_then(|pane_group| pane_group.upgrade(ctx))
+                .is_some_and(|pane_group| pane_group.as_ref(ctx).left_panel_open);
+        self.pr_stack_view.update(ctx, |view, ctx| {
+            view.set_active(is_visible, ctx);
+        });
     }
 
     fn deactivate_file_tree_view_for_pane_group(
@@ -1294,6 +1350,7 @@ impl View for LeftPanelView {
                 }
                 ToolPanelView::WarpDrive => ctx.focus(&self.warp_drive_view),
                 ToolPanelView::ConversationListView => ctx.focus(&self.conversation_list_view),
+                ToolPanelView::PrStack => ctx.focus(&self.pr_stack_view),
             }
         }
     }
@@ -1308,6 +1365,7 @@ impl View for LeftPanelView {
                 .clone(),
             self.mouse_state_handles.global_search_button.clone(),
             self.mouse_state_handles.warp_drive_button.clone(),
+            self.mouse_state_handles.pr_stack_button.clone(),
         ];
 
         // If there is only one button in the toolbelt row,
@@ -1371,6 +1429,9 @@ impl View for LeftPanelView {
                 ToolPanelView::ConversationListView => {
                     Shrinkable::new(1.0, ChildView::new(&self.conversation_list_view).finish())
                         .finish()
+                }
+                ToolPanelView::PrStack => {
+                    Shrinkable::new(1.0, ChildView::new(&self.pr_stack_view).finish()).finish()
                 }
             }
         };

@@ -265,7 +265,7 @@ use crate::code::editor_management::CodeSource;
 #[cfg(feature = "local_fs")]
 use crate::code_review::CodeReviewTelemetryEvent;
 use crate::code_review::GlobalCodeReviewModel;
-use crate::code_review::diff_state::DiffStateModel;
+use crate::code_review::diff_state::{DiffMode, DiffStateModel};
 use crate::code_review::telemetry_event::CodeReviewPaneEntrypoint;
 use crate::coding_panel_enablement_state::CodingPanelEnablementState;
 use crate::context_chips::ChipRuntimeCapabilities;
@@ -4395,6 +4395,7 @@ impl Workspace {
                 },
                 LeftPanelDisplayedTab::WarpDrive => ToolPanelView::WarpDrive,
                 LeftPanelDisplayedTab::ConversationListView => ToolPanelView::ConversationListView,
+                LeftPanelDisplayedTab::PrStack => ToolPanelView::PrStack,
             };
             lp.restore_active_view_from_snapshot(active_view, ctx);
             lp.set_active_pane_group(pane_group.clone(), &self.working_directories_model, ctx);
@@ -6802,6 +6803,41 @@ impl Workspace {
                     modal.start_sign_in(ctx);
                 });
             }
+            LeftPanelEvent::OpenPrStackDiff { repo, base } => {
+                self.open_pr_stack_diff(repo.clone(), base.clone(), ctx);
+            }
+        }
+    }
+
+    /// Opens the code review panel for `repo` diffed against `base` (a PR
+    /// stack branch against its parent).
+    fn open_pr_stack_diff(&mut self, repo: PathBuf, base: String, ctx: &mut ViewContext<Self>) {
+        let repo_path = LocalOrRemotePath::Local(repo);
+        let pane_group = self.active_tab_pane_group().clone();
+        let Some(diff_state_model) = self.working_directories_model.update(ctx, |model, ctx| {
+            model.get_or_create_diff_state_model(repo_path.clone(), None, ctx)
+        }) else {
+            return;
+        };
+        let context = CodeReviewPaneContext {
+            repo_path: Some(repo_path.clone()),
+            diff_state_model,
+        };
+        self.open_right_panel(
+            &context,
+            &pane_group,
+            CodeReviewPaneEntrypoint::Other,
+            None,
+            ctx,
+        );
+        if let Some(code_review) = self
+            .working_directories_model
+            .as_ref(ctx)
+            .get_code_review_view(pane_group.id(), &repo_path)
+        {
+            code_review.update(ctx, |view, ctx| {
+                view.set_diff_base(DiffMode::OtherBranch(base), ctx);
+            });
         }
     }
 
@@ -20749,6 +20785,7 @@ impl Workspace {
                         ToolPanelView::GlobalSearch { .. } => "Global search",
                         ToolPanelView::WarpDrive => "Warp Drive",
                         ToolPanelView::ConversationListView => "Agent conversations",
+                        ToolPanelView::PrStack => "PR stack",
                     }
                 } else {
                     "Tools panel"
@@ -20803,6 +20840,7 @@ impl Workspace {
                 ToolPanelView::GlobalSearch { .. } => "Global search",
                 ToolPanelView::WarpDrive => "Warp Drive",
                 ToolPanelView::ConversationListView => "Agent conversations",
+                ToolPanelView::PrStack => "PR stack",
             }
         } else {
             "Tools panel"
@@ -24013,6 +24051,9 @@ impl Workspace {
         }
         if *WarpDriveSettings::as_ref(ctx).enable_warp_drive {
             views.push(ToolPanelView::WarpDrive);
+        }
+        if cfg!(feature = "local_fs") && FeatureFlag::PrStackView.is_enabled() {
+            views.push(ToolPanelView::PrStack);
         }
         views
     }
