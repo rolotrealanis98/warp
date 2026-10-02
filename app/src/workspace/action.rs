@@ -842,6 +842,10 @@ pub enum WorkspaceAction {
     OpenTaskAgentModal,
     /// Name the active session after a task (key + title) without launching anything.
     RenameSessionFromTask,
+    /// Open the PR review agent launcher for the active session's repository.
+    OpenPrAgentModal,
+    /// Open the pull request a PR agent pane watches and clear its unread updates.
+    OpenPrAgentPullRequest(EntityId),
     /// Create a new worktree in the given repo using the default worktree tab config.
     /// The branch name is auto-generated.
     OpenWorktreeInRepo {
@@ -1113,6 +1117,8 @@ impl WorkspaceAction {
             | OpenNewWorktreeRepoPicker
             | OpenTaskAgentModal
             | RenameSessionFromTask
+            | OpenPrAgentModal
+            | OpenPrAgentPullRequest(_)
             | OpenWorktreeInRepo { .. }
             | OpenWorktreeAddRepoPicker
             | Crash

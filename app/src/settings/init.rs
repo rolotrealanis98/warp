@@ -109,6 +109,7 @@ pub fn register_all_settings(ctx: &mut AppContext) {
     SameLinePromptBlockSettings::register(ctx);
     SemanticSelection::register(ctx);
     crate::task_agent::settings::TaskAgentSettings::register(ctx);
+    crate::pr_agent::settings::PrAgentSettings::register(ctx);
     if FeatureFlag::WarpControlCli.is_enabled() {
         LocalControlSettings::register(ctx);
     }

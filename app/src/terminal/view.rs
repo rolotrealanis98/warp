@@ -39,6 +39,7 @@ mod passive_suggestions;
 mod pending_user_query;
 #[cfg(not(target_family = "wasm"))]
 pub(crate) mod plugin_instructions_block;
+mod pr_agent;
 pub mod rich_content;
 mod shared_session;
 mod shell_terminated_banner;

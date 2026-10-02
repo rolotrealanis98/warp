@@ -54,6 +54,7 @@ mod notification;
 mod palette;
 mod persistence;
 mod platform;
+mod pr_agent;
 mod pr_stack;
 mod prefix;
 #[cfg(target_os = "macos")]
@@ -2123,6 +2124,7 @@ pub(crate) fn initialize_app(
     tab_configs::new_worktree_modal::init(ctx);
     tab_configs::params_modal::init(ctx);
     task_agent::init(ctx);
+    pr_agent::init(ctx);
     ai::blocklist::init(ctx);
     ai::blocklist::block::status_bar::init(ctx);
     drive::index::init(ctx);
@@ -2271,6 +2273,7 @@ pub(crate) fn initialize_app(
     ctx.add_singleton_model(|_| RestoredAgentConversations::new());
     ctx.add_singleton_model(|_| CLIAgentSessionsModel::new());
     ctx.add_singleton_model(task_agent::TaskSessionsModel::new);
+    ctx.add_singleton_model(pr_agent::PrAgentModel::new);
     // ActiveAgentViewsModel is used to track active agent conversations and notify listeners when they change.
     ctx.add_singleton_model(|_| ActiveAgentViewsModel::new());
     ctx.add_singleton_model(AgentNotificationsModel::new);

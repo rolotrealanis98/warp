@@ -15,6 +15,7 @@ pub(crate) mod left_panel;
 pub(crate) mod onboarding;
 pub(crate) mod openwarp_launch_modal;
 pub(crate) mod orchestration_launch_modal;
+mod pr_agent;
 pub(crate) mod right_panel;
 mod startup_directory;
 mod tab_grouping;
@@ -1116,6 +1117,7 @@ pub struct Workspace {
     onboarding_tutorial_deferred_by_modal: Option<DeferredOnboardingTutorial>,
     new_worktree_modal: ModalViewState<Modal<NewWorktreeModal>>,
     task_agent_modal: ModalViewState<Modal<crate::task_agent::TaskAgentModal>>,
+    pr_agent_modal: ModalViewState<Modal<crate::pr_agent::PrAgentModal>>,
     close_session_confirmation_dialog: ViewHandle<CloseSessionConfirmationDialog>,
     rewind_confirmation_dialog: ViewHandle<RewindConfirmationDialog>,
     delete_conversation_confirmation_dialog: ViewHandle<DeleteConversationConfirmationDialog>,
@@ -3097,6 +3099,7 @@ impl Workspace {
         let tab_config_params_modal = Self::build_tab_config_params_modal(ctx);
         let new_worktree_modal = Self::build_new_worktree_modal(ctx);
         let task_agent_modal = Self::build_task_agent_modal(ctx);
+        let pr_agent_modal = Self::build_pr_agent_modal(ctx);
 
         let session_config_modal = Self::build_session_config_modal(ctx);
 
@@ -3502,6 +3505,7 @@ impl Workspace {
             onboarding_tutorial_deferred_by_modal: None,
             new_worktree_modal,
             task_agent_modal,
+            pr_agent_modal,
             close_session_confirmation_dialog,
             rewind_confirmation_dialog,
             delete_conversation_confirmation_dialog,
@@ -24419,6 +24423,10 @@ impl TypedActionView for Workspace {
                 crate::task_agent::TaskAgentModalMode::Rename,
                 ctx,
             ),
+            OpenPrAgentModal => self.open_pr_agent_modal(ctx),
+            OpenPrAgentPullRequest(terminal_view_id) => {
+                self.open_pr_agent_pull_request(*terminal_view_id, ctx)
+            }
             OpenTabConfigErrorFile {
                 #[cfg_attr(not(feature = "local_fs"), allow(unused_variables))]
                 path,
@@ -27640,6 +27648,10 @@ impl View for Workspace {
 
         if self.task_agent_modal.is_open() {
             stack.add_child(self.task_agent_modal.render());
+        }
+
+        if self.pr_agent_modal.is_open() {
+            stack.add_child(self.pr_agent_modal.render());
         }
 
         if self.workflow_modal.as_ref(app).is_open() {

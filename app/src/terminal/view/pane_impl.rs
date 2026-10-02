@@ -38,6 +38,7 @@ use crate::pane_group::pane::view::header::components::{
 use crate::pane_group::pane::view::header::{PANE_HEADER_HEIGHT, render_pane_header_draggable};
 use crate::pane_group::pane::{PaneStack, view};
 use crate::pane_group::{BackingView, SplitPaneState, TOGGLE_MAXIMIZE_PANE_BINDING_NAME};
+use crate::pr_agent::PrAgentModel;
 use crate::settings::app_installation_detection::{
     UserAppInstallDetectionSettings, UserAppInstallStatus,
 };
@@ -376,6 +377,9 @@ impl TerminalView {
         }
         if let Some(key_chip) = TaskSessionsModel::render_key_chip(self.view_id, app) {
             center_row.add_child(Container::new(key_chip).with_margin_left(6.).finish());
+        }
+        if let Some(pr_chips) = PrAgentModel::render_header_chips(self.view_id, app) {
+            center_row.add_child(Container::new(pr_chips).with_margin_left(2.).finish());
         }
 
         center_row.finish()
@@ -762,6 +766,7 @@ impl BackingView for TerminalView {
             || FeatureFlag::ContextWindowUsageV2.is_enabled()
                 && self.split_pane_state(app).is_in_split_pane()
             || TaskSessionsModel::has_key(self.view_id, app)
+            || PrAgentModel::is_watching(self.view_id, app)
     }
 
     fn render_header_content(
