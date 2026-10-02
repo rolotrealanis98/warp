@@ -850,6 +850,17 @@ pub enum WorkspaceAction {
     Jira(crate::jira::JiraCommand),
     /// Open a tab in the active session's directory running Claude Code (fork).
     NewClaudeCodeTab,
+    /// Open a tab running Claude Code in `cwd`, with `prompt` (empty for none) as its first
+    /// message.
+    OpenClaudeCodeTab {
+        cwd: PathBuf,
+        prompt: String,
+    },
+    /// Open a tab in `cwd` that resumes a stored Claude Code session.
+    ResumeClaudeSession {
+        cwd: PathBuf,
+        session_id: uuid::Uuid,
+    },
     /// Create a new worktree in the given repo using the default worktree tab config.
     /// The branch name is auto-generated.
     OpenWorktreeInRepo {
@@ -1125,6 +1136,8 @@ impl WorkspaceAction {
             | OpenPrAgentModal
             | OpenPrAgentPullRequest(_)
             | Jira(_)
+            | OpenClaudeCodeTab { .. }
+            | ResumeClaudeSession { .. }
             | OpenWorktreeInRepo { .. }
             | OpenWorktreeAddRepoPicker
             | Crash

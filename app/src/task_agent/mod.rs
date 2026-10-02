@@ -145,6 +145,24 @@ impl TaskAgentRequest {
     }
 }
 
+/// A request to start Claude Code in `dir` as it is, with `prompt` (empty for none) as its first
+/// message. The prompt's first line names the session.
+pub(crate) fn claude_code_here(dir: PathBuf, prompt: String, app: &AppContext) -> TaskAgentRequest {
+    let title = prompt
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or(CLIAgent::Claude.display_name())
+        .to_string();
+    TaskAgentRequest {
+        title,
+        checkout: Checkout::Here,
+        cli: CLIAgent::Claude,
+        prompt,
+        ..TaskAgentRequest::draft(dir, app)
+    }
+}
+
 /// Where the agent works. An empty `base` means the current `HEAD` of the repository.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Checkout {
@@ -292,6 +310,19 @@ pub(crate) fn plan_launch(request: &TaskAgentRequest, config: &TaskAgentConfig) 
             branch,
             checkout: request.checkout.clone(),
         },
+    }
+}
+
+impl LaunchPlan {
+    /// Writes the prompt file the agent command reads, if the plan has one.
+    pub(crate) fn write_prompt_file(&self) -> std::io::Result<()> {
+        let Some((path, contents)) = &self.prompt_file else {
+            return Ok(());
+        };
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(path, contents)
     }
 }
 

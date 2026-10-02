@@ -17,7 +17,8 @@ use crate::pane_group::PanesLayout;
 use crate::task_agent::settings::TaskAgentSettings;
 use crate::task_agent::{
     Checkout, LaunchPlan, TaskAgentModal, TaskAgentModalEvent, TaskAgentModalMode,
-    TaskAgentRequest, TaskSession, TaskSessionsModel, plan_launch, session_title, template_vars,
+    TaskAgentRequest, TaskSession, TaskSessionsModel, claude_code_here, plan_launch, session_title,
+    template_vars,
 };
 use crate::terminal::{CLIAgent, TerminalView};
 use crate::view_components::DismissibleToast;
@@ -155,23 +156,17 @@ impl Workspace {
         plan: LaunchPlan,
         ctx: &mut ViewContext<Self>,
     ) -> Option<ViewHandle<TerminalView>> {
-        if let Some((path, contents)) = &plan.prompt_file {
-            let written = path
-                .parent()
-                .map_or(Ok(()), std::fs::create_dir_all)
-                .and_then(|()| std::fs::write(path, contents));
-            if let Err(err) = written {
-                log::error!("Failed to write the task agent prompt file: {err}");
-                self.toast_stack.update(ctx, |toast_stack, ctx| {
-                    toast_stack.add_ephemeral_toast(
-                        DismissibleToast::error(format!(
-                            "Could not start the task agent: failed to write its prompt ({err})"
-                        )),
-                        ctx,
-                    );
-                });
-                return None;
-            }
+        if let Err(err) = plan.write_prompt_file() {
+            log::error!("Failed to write the task agent prompt file: {err}");
+            self.toast_stack.update(ctx, |toast_stack, ctx| {
+                toast_stack.add_ephemeral_toast(
+                    DismissibleToast::error(format!(
+                        "Could not start the task agent: failed to write its prompt ({err})"
+                    )),
+                    ctx,
+                );
+            });
+            return None;
         }
 
         let prefer_agent_title = *TaskAgentSettings::as_ref(ctx).prefer_agent_title;
@@ -221,10 +216,36 @@ impl Workspace {
             .active_session_view(ctx)
             .and_then(|view| view.as_ref(ctx).pwd_if_local(ctx).map(PathBuf::from))
             .unwrap_or_default();
+        self.launch_claude_code_tab(cwd, String::new(), ctx);
+    }
+
+    /// Opens a tab running Claude Code in `cwd`, with `prompt` (empty for none) as its first
+    /// message.
+    pub(super) fn launch_claude_code_tab(
+        &mut self,
+        cwd: PathBuf,
+        prompt: String,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        let config = TaskAgentSettings::as_ref(ctx).config_for(&cwd);
+        let request = claude_code_here(cwd, prompt, ctx);
+        self.launch_task_agent(plan_launch(&request, &config), ctx);
+    }
+
+    /// Opens a tab in `cwd` that resumes Claude Code session `session_id`.
+    pub(super) fn resume_claude_session(
+        &mut self,
+        cwd: PathBuf,
+        session_id: uuid::Uuid,
+        ctx: &mut ViewContext<Self>,
+    ) {
         let pane = PaneTemplateType::PaneTemplate {
             cwd,
             commands: vec![CommandTemplate {
-                exec: CLIAgent::Claude.command_prefix().to_string(),
+                exec: format!(
+                    "{} --resume {session_id}",
+                    CLIAgent::Claude.command_prefix()
+                ),
             }],
             is_focused: Some(true),
             pane_mode: PaneMode::Terminal,

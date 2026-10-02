@@ -24439,6 +24439,12 @@ impl TypedActionView for Workspace {
             }
             Jira(command) => self.handle_jira_command(*command, ctx),
             NewClaudeCodeTab => self.open_claude_code_tab(ctx),
+            OpenClaudeCodeTab { cwd, prompt } => {
+                self.launch_claude_code_tab(cwd.clone(), prompt.clone(), ctx);
+            }
+            ResumeClaudeSession { cwd, session_id } => {
+                self.resume_claude_session(cwd.clone(), *session_id, ctx);
+            }
             OpenTabConfigErrorFile {
                 #[cfg_attr(not(feature = "local_fs"), allow(unused_variables))]
                 path,
