@@ -703,6 +703,27 @@ impl BackingView for TerminalView {
             );
         }
 
+        // Fork feature: chat rendering of the pane's CLI agent session.
+        if self.can_show_cli_chat_view(ctx) {
+            if !items.is_empty() {
+                items.push(MenuItem::Separator);
+            }
+            let label = if self.is_cli_chat_view_shown() {
+                "Show terminal view"
+            } else {
+                "Show chat view"
+            };
+            items.push(
+                MenuItemFields::new(label)
+                    .with_on_select_action(TerminalAction::ToggleCliChatView)
+                    .with_key_shortcut_label(keybinding_name_to_display_string(
+                        crate::ai::cli_chat::TOGGLE_CLI_CHAT_VIEW_BINDING,
+                        ctx,
+                    ))
+                    .into_item(),
+            );
+        }
+
         // Split-pane related items.
         if self.split_pane_state(ctx).is_in_split_pane() {
             if !items.is_empty() {

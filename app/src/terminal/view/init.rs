@@ -56,6 +56,8 @@ pub const CAN_FORK_FROM_LAST_KNOWN_GOOD_STATE_KEY: &str = "CanForkFromLastKnownG
 pub const INPUT_BOX_VISIBLE_KEY: &str = "InputVisible";
 pub const KEYBOARD_PROTOCOL_ENABLED_KEY: &str = "KeyboardProtocolEnabled";
 pub const CLI_AGENT_SESSION_ACTIVE_KEY: &str = "CLIAgentSessionActive";
+/// Set when the pane's CLI agent session can be shown as a chat (fork feature).
+pub const CLI_CHAT_VIEW_AVAILABLE_KEY: &str = "CliChatViewAvailable";
 /// Shared-session availability for attach-file, including FileAttach's cloud-viewer exception.
 pub const CAN_ATTACH_FILE_KEY: &str = "CanAttachFile";
 pub const ROOT_CLOUD_MODE_PANE_KEY: &str = "RootCloudModePane";
@@ -324,6 +326,18 @@ pub fn init(app: &mut AppContext) {
             // not on the editor — see #9916).
             | (id!("Terminal") & !id!("IMEOpen") & id!(flags::CLI_AGENT_RICH_INPUT_OPEN)),
         ),
+        // Fork feature: swap the pane between terminal and chat renderings of
+        // its CLI agent session. Also matches while the chat composer has focus.
+        EditableBinding::new(
+            crate::ai::cli_chat::TOGGLE_CLI_CHAT_VIEW_BINDING,
+            "Toggle CLI Agent Chat View",
+            TerminalAction::ToggleCliChatView,
+        )
+        .with_key_binding("cmdorctrl-shift-L")
+        .with_context_predicate(
+            id!("Terminal") & !id!("IMEOpen") & id!(CLI_CHAT_VIEW_AVAILABLE_KEY),
+        )
+        .with_enabled(|| FeatureFlag::CliAgentChatView.is_enabled()),
         EditableBinding::new(
             "terminal:warpify_subshell",
             "Warpify subshell",

@@ -5,6 +5,7 @@ mod block_banner;
 pub mod block_onboarding;
 pub(crate) mod blocklist_filter;
 mod bookmarks;
+mod cli_chat;
 mod context_menu;
 pub mod init;
 pub mod inline_banner;
@@ -2986,6 +2987,10 @@ pub struct TerminalView {
     /// State handle for the shimmering text animation in the remote server loading footer.
     /// Persisted across renders so the animation doesn't restart.
     remote_server_shimmer_handle: ShimmeringTextStateHandle,
+
+    /// Chat rendering of the pane's CLI agent session, while it replaces the
+    /// terminal rendering (fork feature `CliAgentChatView`).
+    cli_chat_view: Option<ViewHandle<crate::ai::cli_chat::CliChatView>>,
 }
 
 /// Parameters stashed when a code review pane open is requested with
@@ -3930,6 +3935,7 @@ impl TerminalView {
                 me.auto_stop_sharing_on_cli_end = false;
                 me.stop_sharing_session(SharedSessionActionSource::NonUser, ctx);
             }
+            me.handle_cli_chat_session_event(event, ctx);
             me.handle_cli_agent_sessions_event(event, ctx)
         });
         ctx.subscribe_to_model(
@@ -4426,6 +4432,7 @@ impl TerminalView {
             focus_handle: None,
             sessions,
             remote_server_shimmer_handle: ShimmeringTextStateHandle::new(),
+            cli_chat_view: None,
             active_block_metadata: None,
             canonical_session_pwd_cache: RefCell::new(None),
             block_text_selection_start_position: None,
@@ -21775,6 +21782,10 @@ impl TerminalView {
             return;
         }
 
+        if self.focus_cli_chat_view_if_shown(ctx) {
+            return;
+        }
+
         // If the onboarding callout is active, it should win focus so that its displayed
         // keybindings (enter/delete) actually work.
         if self.focus_onboarding_callout_if_active(ctx) {
@@ -27528,6 +27539,7 @@ impl TypedActionView for TerminalView {
             | CyclePreviousOrchestrationChildAgent
             | CycleNextOrchestrationChildAgent
             | ToggleCLIAgentRichInput
+            | ToggleCliChatView
             | ToggleSessionRecording
             | Osc52AllowBlockedClipboardOperation => Empty,
         }
@@ -28677,6 +28689,7 @@ impl TypedActionView for TerminalView {
                     recorder.toggle_recording(ctx);
                 });
             }
+            ToggleCliChatView => self.toggle_cli_chat_view(ctx),
             ToggleCLIAgentRichInput => {
                 if self.has_active_cli_agent_input_session(ctx) {
                     self.close_cli_agent_rich_input_and_disable_auto_toggle(ctx);
@@ -28710,6 +28723,10 @@ impl View for TerminalView {
     }
 
     fn render(&self, app: &AppContext) -> Box<dyn Element> {
+        if let Some(chat_view) = &self.cli_chat_view {
+            return ChildView::new(chat_view).finish();
+        }
+
         // Grab this here, before we take the terminal model lock.
         let menu_positioning = self.input.as_ref(app).menu_positioning(app);
 
@@ -29245,6 +29262,7 @@ impl View for TerminalView {
         if focus_ctx.is_self_focused() {
             self.maybe_report_focus_in(ctx);
             ctx.dispatch_typed_action(&PaneGroupAction::HandleFocusChange);
+            self.focus_cli_chat_view_if_shown(ctx);
 
             // Forward focus to the active SSH remote-server choice block so
             // its keyboard-navigable buttons stay interactive.
@@ -29330,6 +29348,9 @@ impl View for TerminalView {
 
         if let Some(session) = CLIAgentSessionsModel::as_ref(app).session(self.view_id) {
             context.set.insert(init::CLI_AGENT_SESSION_ACTIVE_KEY);
+            if crate::ai::cli_chat::supports_agent(session.agent) {
+                context.set.insert(init::CLI_CHAT_VIEW_AVAILABLE_KEY);
+            }
             if session.agent.supports_cli_agent_footer()
                 && *AISettings::as_ref(app).should_render_cli_agent_footer
             {

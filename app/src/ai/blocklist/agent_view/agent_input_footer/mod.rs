@@ -228,6 +228,8 @@ pub struct AgentInputFooter {
 
     // CLI agent-specific buttons (rendered when a CLI agent session is active).
     rich_input_button: ViewHandle<ActionButton>,
+    /// Opens the chat rendering of the CLI agent session (fork feature).
+    chat_view_button: ViewHandle<ActionButton>,
     settings_button: ViewHandle<ActionButton>,
     install_plugin_button: ViewHandle<ActionButton>,
     plugin_instructions_button: ViewHandle<ActionButton>,
@@ -501,6 +503,19 @@ impl AgentInputFooter {
                 .on_click(|ctx| {
                     ctx.dispatch_typed_action(AgentInputFooterAction::ToggleRichInput);
                 })
+        });
+        let chat_view_button = ctx.add_typed_action_view(|ctx| {
+            ActionButton::new("Chat", AgentInputButtonTheme)
+                .with_icon(Icon::MessageText)
+                .with_tooltip("Show this session as a chat")
+                .with_size(cli_button_size)
+                .with_tooltip_alignment(TooltipAlignment::Left)
+                .with_keybinding(
+                    KeystrokeSource::Binding(crate::ai::cli_chat::TOGGLE_CLI_CHAT_VIEW_BINDING),
+                    ctx,
+                )
+                .with_compact_keybinding(true)
+                .on_click(|ctx| ctx.dispatch_typed_action(TerminalAction::ToggleCliChatView))
         });
         let settings_button = ctx.add_typed_action_view(|_ctx| {
             ActionButton::new("", AgentInputButtonTheme)
@@ -963,6 +978,7 @@ impl AgentInputFooter {
             file_button,
             file_explorer_button,
             rich_input_button,
+            chat_view_button,
             settings_button,
             start_remote_control_button,
             stop_remote_control_button,
@@ -1762,6 +1778,12 @@ impl AgentInputFooter {
             ) {
                 left_buttons.add_child(element);
             }
+        }
+        if self
+            .cli_agent(app)
+            .is_some_and(crate::ai::cli_chat::supports_agent)
+        {
+            left_buttons.add_child(ChildView::new(&self.chat_view_button).finish());
         }
 
         let mut right_buttons = Flex::row()

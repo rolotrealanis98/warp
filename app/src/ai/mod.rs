@@ -20,6 +20,7 @@ pub mod aws_credentials;
 pub(crate) mod bedrock_credentials;
 pub(crate) mod block_context;
 pub(crate) mod blocklist;
+pub(crate) mod cli_chat;
 pub mod chatgpt_subscription;
 #[cfg(any(feature = "local_fs", not(target_family = "wasm")))]
 pub(crate) mod codebase_auto_indexing;
@@ -88,5 +89,6 @@ pub fn init(app: &mut AppContext) {
     blocklist::suggested_rule_modal::init(app);
     ai_document_view::init(app);
     conversation_details_panel::init(app);
+    cli_chat::init(app);
     agent_management::init(app);
 }
