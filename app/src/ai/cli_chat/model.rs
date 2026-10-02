@@ -10,7 +10,7 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use markdown_parser::{FormattedText, parse_markdown};
 use serde_json::Value;
-use warpui::r#async::Timer;
+use warpui::r#async::{SpawnedFutureHandle, Timer};
 use warpui::{Entity, EntityId, ModelContext, SingletonEntity};
 
 use super::source::{ChatEvent, CliTranscriptSource};
@@ -415,6 +415,10 @@ pub(crate) struct CliChatModel {
     /// Subagent threads keyed by the parent's tool call id. Only threads the
     /// user expanded are tailed.
     subagents: HashMap<String, SubagentTail>,
+    /// Whether the transcript is tailed; off while the chat view is hidden.
+    active: bool,
+    /// The scheduled next poll, aborted when tailing pauses.
+    next_poll: Option<SpawnedFutureHandle>,
 }
 
 impl Entity for CliChatModel {
@@ -437,9 +441,28 @@ impl CliChatModel {
             read_in_flight: false,
             thread: Thread::default(),
             subagents: HashMap::new(),
+            active: true,
+            next_poll: None,
         };
         model.poll(ctx);
         model
+    }
+
+    /// Pauses or resumes tailing. Resuming reads everything written meanwhile.
+    pub(crate) fn set_active(&mut self, active: bool, ctx: &mut ModelContext<Self>) {
+        if self.active == active {
+            return;
+        }
+        self.active = active;
+        if active {
+            self.poll(ctx);
+        } else if let Some(next_poll) = self.next_poll.take() {
+            next_poll.abort();
+        }
+    }
+
+    pub(crate) fn is_active(&self) -> bool {
+        self.active
     }
 
     pub(crate) fn thread(&self) -> &Thread {
@@ -476,7 +499,10 @@ impl CliChatModel {
     }
 
     fn schedule_poll(&mut self, ctx: &mut ModelContext<Self>) {
-        ctx.spawn(Timer::after(POLL_INTERVAL), |me, _, ctx| me.poll(ctx));
+        if self.active {
+            self.next_poll =
+                Some(ctx.spawn(Timer::after(POLL_INTERVAL), |me, _, ctx| me.poll(ctx)));
+        }
     }
 
     fn poll(&mut self, ctx: &mut ModelContext<Self>) {

@@ -1,6 +1,7 @@
 //! Swaps a terminal pane between its terminal rendering and the chat
 //! rendering of the CLI agent running in it (see `crate::ai::cli_chat`).
 //! Only the rendering changes; the PTY and the agent process are untouched.
+//! The chat view lives until the session ends, so hiding it keeps its state.
 
 use chrono::Utc;
 use warpui::{AppContext, SingletonEntity, ViewContext};
@@ -18,11 +19,11 @@ impl TerminalView {
     }
 
     pub(super) fn is_cli_chat_view_shown(&self) -> bool {
-        self.cli_chat_view.is_some()
+        self.cli_chat_view_shown
     }
 
     pub(super) fn toggle_cli_chat_view(&mut self, ctx: &mut ViewContext<Self>) {
-        if self.cli_chat_view.is_some() {
+        if self.cli_chat_view_shown {
             self.hide_cli_chat_view(ctx);
         } else {
             self.show_cli_chat_view(ctx);
@@ -30,48 +31,68 @@ impl TerminalView {
     }
 
     fn show_cli_chat_view(&mut self, ctx: &mut ViewContext<Self>) {
-        if self.cli_chat_view.is_some() || !self.can_show_cli_chat_view(ctx) {
+        if self.cli_chat_view_shown || !self.can_show_cli_chat_view(ctx) {
             return;
         }
-        let Some(agent) = CLIAgentSessionsModel::as_ref(ctx)
-            .session(self.view_id)
-            .map(|session| session.agent)
-        else {
-            return;
+        let chat_view = match &self.cli_chat_view {
+            Some(chat_view) => {
+                chat_view.update(ctx, |chat_view, ctx| chat_view.set_visible(true, ctx));
+                chat_view.clone()
+            }
+            None => {
+                let Some(agent) = CLIAgentSessionsModel::as_ref(ctx)
+                    .session(self.view_id)
+                    .map(|session| session.agent)
+                else {
+                    return;
+                };
+                let terminal_view_id = self.view_id;
+                let pane_cwd = self.pwd();
+                // The agent command's start: agents found by cwd only match transcripts
+                // written since then, which excludes earlier sessions in the same cwd.
+                let opened_after = self
+                    .model
+                    .lock()
+                    .block_list()
+                    .active_block()
+                    .start_ts()
+                    .map_or_else(Utc::now, |start| start.with_timezone(&Utc));
+                let chat_view = ctx.add_typed_action_view(|ctx| {
+                    CliChatView::new(terminal_view_id, agent, pane_cwd, opened_after, ctx)
+                });
+                ctx.subscribe_to_view(&chat_view, |me, _, event, ctx| {
+                    me.handle_cli_chat_view_event(event, ctx);
+                });
+                self.cli_chat_view = Some(chat_view.clone());
+                chat_view
+            }
         };
-        let terminal_view_id = self.view_id;
-        let pane_cwd = self.pwd();
-        // The agent command's start: agents found by cwd only match transcripts
-        // written since then, which excludes earlier sessions in the same cwd.
-        let opened_after = self
-            .model
-            .lock()
-            .block_list()
-            .active_block()
-            .start_ts()
-            .map_or_else(Utc::now, |start| start.with_timezone(&Utc));
-        let chat_view = ctx.add_typed_action_view(|ctx| {
-            CliChatView::new(terminal_view_id, agent, pane_cwd, opened_after, ctx)
-        });
-        ctx.subscribe_to_view(&chat_view, |me, _, event, ctx| {
-            me.handle_cli_chat_view_event(event, ctx);
-        });
         ctx.focus(&chat_view);
-        self.cli_chat_view = Some(chat_view);
+        self.cli_chat_view_shown = true;
         ctx.notify();
     }
 
+    /// Shows the terminal rendering; the chat view stays around, paused.
     fn hide_cli_chat_view(&mut self, ctx: &mut ViewContext<Self>) {
-        if self.cli_chat_view.take().is_some() {
-            self.redetermine_global_focus(ctx);
-            ctx.notify();
+        if !self.cli_chat_view_shown {
+            return;
         }
+        self.cli_chat_view_shown = false;
+        if let Some(chat_view) = &self.cli_chat_view {
+            chat_view.update(ctx, |chat_view, ctx| chat_view.set_visible(false, ctx));
+        }
+        self.redetermine_global_focus(ctx);
+        ctx.notify();
     }
 
     /// Sends focus to the chat composer while the chat view is shown. Returns
     /// whether it did.
     pub(super) fn focus_cli_chat_view_if_shown(&self, ctx: &mut ViewContext<Self>) -> bool {
-        let Some(chat_view) = &self.cli_chat_view else {
+        let Some(chat_view) = self
+            .cli_chat_view
+            .as_ref()
+            .filter(|_| self.cli_chat_view_shown)
+        else {
             return false;
         };
         chat_view.update(ctx, |chat_view, ctx| chat_view.focus_composer(ctx));
@@ -114,7 +135,10 @@ impl TerminalView {
             {
                 self.show_cli_chat_view(ctx);
             }
-            CLIAgentSessionsModelEvent::Ended { .. } => self.hide_cli_chat_view(ctx),
+            CLIAgentSessionsModelEvent::Ended { .. } => {
+                self.hide_cli_chat_view(ctx);
+                self.cli_chat_view = None;
+            }
             _ => {}
         }
     }

@@ -105,3 +105,52 @@ fn chat_view_closes_when_the_session_ends() {
         terminal.read(&app, |view, _| assert!(!view.is_cli_chat_view_shown()));
     })
 }
+
+/// The chat view's id and whether it tails the transcript, if the pane has one.
+fn chat_view_state(app: &App, terminal: &ViewHandle<TerminalView>) -> Option<(EntityId, bool)> {
+    terminal.read(app, |view, ctx| {
+        view.cli_chat_view
+            .as_ref()
+            .map(|chat_view| (chat_view.id(), chat_view.as_ref(ctx).is_tailing(ctx)))
+    })
+}
+
+#[test]
+fn hidden_chat_view_is_kept_paused_and_reused_when_shown_again() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let _flag = FeatureFlag::CliAgentChatView.override_enabled(true);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let view_id = terminal.read(&app, |view, _| view.view_id);
+        start_session(&mut app, view_id, CLIAgent::Claude);
+
+        toggle(&mut app, &terminal);
+        let shown = chat_view_state(&app, &terminal).expect("chat view should exist");
+        toggle(&mut app, &terminal);
+        let hidden = chat_view_state(&app, &terminal);
+        toggle(&mut app, &terminal);
+        let shown_again = chat_view_state(&app, &terminal);
+
+        assert_eq!(hidden, Some((shown.0, false)));
+        assert_eq!(shown_again, Some((shown.0, true)));
+    })
+}
+
+#[test]
+fn hidden_chat_view_is_dropped_when_the_session_ends() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let _flag = FeatureFlag::CliAgentChatView.override_enabled(true);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let view_id = terminal.read(&app, |view, _| view.view_id);
+        start_session(&mut app, view_id, CLIAgent::Claude);
+        toggle(&mut app, &terminal);
+        toggle(&mut app, &terminal);
+
+        CLIAgentSessionsModel::handle(&app).update(&mut app, |sessions, ctx| {
+            sessions.remove_session(view_id, ctx);
+        });
+
+        assert_eq!(chat_view_state(&app, &terminal), None);
+    })
+}

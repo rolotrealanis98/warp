@@ -284,6 +284,21 @@ impl CliChatView {
         ctx.focus(&self.composer);
     }
 
+    /// Hiding keeps the view (and what the user expanded) but stops tailing the
+    /// transcript; showing again catches up.
+    pub(crate) fn set_visible(&mut self, visible: bool, ctx: &mut ViewContext<Self>) {
+        self.model
+            .update(ctx, |model, ctx| model.set_active(visible, ctx));
+        if visible {
+            self.ensure_ticking(ctx);
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn is_tailing(&self, app: &AppContext) -> bool {
+        self.model.as_ref(app).is_active()
+    }
+
     fn handle_composer_event(&mut self, event: &EditorEvent, ctx: &mut ViewContext<Self>) {
         match event {
             EditorEvent::Enter => {
@@ -324,7 +339,8 @@ impl CliChatView {
 
     /// Re-renders once a second while a turn runs so the elapsed time moves.
     fn ensure_ticking(&mut self, ctx: &mut ViewContext<Self>) {
-        if self.ticking || self.active_status(ctx).is_none() {
+        if self.ticking || !self.model.as_ref(ctx).is_active() || self.active_status(ctx).is_none()
+        {
             return;
         }
         self.ticking = true;

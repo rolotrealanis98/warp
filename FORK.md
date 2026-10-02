@@ -25,7 +25,9 @@ rendering with `Cmd/Ctrl-Shift-L`, the **Chat** button in the CLI agent footer,
 or the pane header menu. The chat is read from the agent's own session
 transcript; the composer and the key strip write to the same PTY, so the
 session keeps running unchanged. The **Terminal** button (or the same shortcut)
-switches back.
+switches back; the chat view (expanded cards, scroll position) is kept, with
+transcript reading paused, until it is shown again. It is discarded when the
+session ends.
 
 | Agent | Transcript | How the pane finds it |
 |-------|------------|-----------------------|

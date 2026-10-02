@@ -2990,9 +2990,12 @@ pub struct TerminalView {
     /// Persisted across renders so the animation doesn't restart.
     remote_server_shimmer_handle: ShimmeringTextStateHandle,
 
-    /// Chat rendering of the pane's CLI agent session, while it replaces the
-    /// terminal rendering (fork feature `CliAgentChatView`).
+    /// Chat rendering of the pane's CLI agent session (fork feature
+    /// `CliAgentChatView`). Kept while hidden so its state survives toggles;
+    /// dropped when the session ends.
     cli_chat_view: Option<ViewHandle<crate::ai::cli_chat::CliChatView>>,
+    /// Whether `cli_chat_view` replaces the terminal rendering.
+    cli_chat_view_shown: bool,
 }
 
 /// Parameters stashed when a code review pane open is requested with
@@ -4435,6 +4438,7 @@ impl TerminalView {
             sessions,
             remote_server_shimmer_handle: ShimmeringTextStateHandle::new(),
             cli_chat_view: None,
+            cli_chat_view_shown: false,
             active_block_metadata: None,
             canonical_session_pwd_cache: RefCell::new(None),
             block_text_selection_start_position: None,
@@ -28735,7 +28739,11 @@ impl View for TerminalView {
     }
 
     fn render(&self, app: &AppContext) -> Box<dyn Element> {
-        if let Some(chat_view) = &self.cli_chat_view {
+        if let Some(chat_view) = self
+            .cli_chat_view
+            .as_ref()
+            .filter(|_| self.cli_chat_view_shown)
+        {
             return ChildView::new(chat_view).finish();
         }
 
