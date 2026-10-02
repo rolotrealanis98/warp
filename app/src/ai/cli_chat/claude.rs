@@ -8,29 +8,22 @@
 //! `<session-id>/subagents/agent-<id>.jsonl`, each with a `.meta.json` naming
 //! the parent's `Agent` tool call.
 
-use std::fs::{self, File};
-use std::io::{self, Read, Seek, SeekFrom};
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::Value;
 
-use super::source::{ChatEvent, CliTranscriptSource};
-
-/// Upper bound on bytes read per poll. A record longer than this is skipped
-/// rather than stalling the tail.
-const MAX_READ_BYTES_PER_POLL: u64 = 32 * 1024 * 1024;
+#[cfg(not(target_family = "wasm"))]
+use super::source::read_from;
+use super::source::{ChatEvent, CliTranscriptSource, JsonlTail, json_lines, parse_timestamp};
 
 pub(crate) struct ClaudeTranscript {
-    path: PathBuf,
+    tail: JsonlTail,
     /// Directory holding this session's subagent transcripts. Subagents of
     /// subagents are stored flat in the same directory.
     subagents_dir: PathBuf,
-    /// Byte offset just past the last complete line consumed.
-    offset: u64,
-    /// Set while discarding a record longer than one poll's read budget.
-    skipping_oversized_record: bool,
 }
 
 impl ClaudeTranscript {
@@ -41,10 +34,8 @@ impl ClaudeTranscript {
 
     fn with_subagents_dir(path: PathBuf, subagents_dir: PathBuf) -> Self {
         Self {
-            path,
+            tail: JsonlTail::new(path),
             subagents_dir,
-            offset: 0,
-            skipping_oversized_record: false,
         }
     }
 
@@ -101,43 +92,11 @@ impl ClaudeTranscript {
     ) -> Option<PathBuf> {
         None
     }
-
-    /// Consumes complete lines from `bytes`, which start at `self.offset`.
-    fn consume(&mut self, bytes: &[u8], read_budget: u64) -> Vec<ChatEvent> {
-        let mut chunk = bytes;
-        if self.skipping_oversized_record {
-            let Some(newline) = chunk.iter().position(|b| *b == b'\n') else {
-                self.offset += chunk.len() as u64;
-                return Vec::new();
-            };
-            self.skipping_oversized_record = false;
-            self.offset += newline as u64 + 1;
-            chunk = &chunk[newline + 1..];
-        }
-        let complete_len = chunk
-            .iter()
-            .rposition(|b| *b == b'\n')
-            .map_or(0, |newline| newline + 1);
-        if complete_len == 0 && chunk.len() as u64 >= read_budget {
-            log::debug!("[cli chat] skipping a transcript record over the read budget");
-            self.skipping_oversized_record = true;
-            self.offset += chunk.len() as u64;
-            return Vec::new();
-        }
-        self.offset += complete_len as u64;
-        parse_records(&chunk[..complete_len])
-    }
 }
 
 impl CliTranscriptSource for ClaudeTranscript {
     fn read_incremental(&mut self) -> Vec<ChatEvent> {
-        match read_from(&self.path, self.offset, MAX_READ_BYTES_PER_POLL) {
-            Ok(bytes) => self.consume(&bytes, MAX_READ_BYTES_PER_POLL),
-            Err(err) => {
-                log::debug!("[cli chat] transcript not readable yet: {err}");
-                Vec::new()
-            }
-        }
+        parse_records(&self.tail.read_lines())
     }
 
     fn subagent(&self, tool_call_id: &str) -> Option<Box<dyn CliTranscriptSource>> {
@@ -166,14 +125,6 @@ impl CliTranscriptSource for ClaudeTranscript {
         }
         None
     }
-}
-
-fn read_from(path: &Path, offset: u64, budget: u64) -> io::Result<Vec<u8>> {
-    let mut file = File::open(path)?;
-    file.seek(SeekFrom::Start(offset))?;
-    let mut bytes = Vec::new();
-    file.take(budget).read_to_end(&mut bytes)?;
-    Ok(bytes)
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -259,14 +210,8 @@ enum Block {
 /// that carry no conversation content are skipped.
 pub(crate) fn parse_records(bytes: &[u8]) -> Vec<ChatEvent> {
     let mut events = Vec::new();
-    for line in bytes.split(|b| *b == b'\n') {
-        if line.iter().all(u8::is_ascii_whitespace) {
-            continue;
-        }
-        match serde_json::from_slice::<Record>(line) {
-            Ok(record) => push_record_events(record, &mut events),
-            Err(err) => log::debug!("[cli chat] skipping malformed transcript line: {err}"),
-        }
+    for record in json_lines::<Record>(bytes) {
+        push_record_events(record, &mut events);
     }
     events
 }
@@ -324,11 +269,7 @@ fn session_title(head: &[u8], tail: &[u8]) -> Option<String> {
 }
 
 fn push_record_events(record: Record, events: &mut Vec<ChatEvent>) {
-    let at = record
-        .timestamp
-        .as_deref()
-        .and_then(|ts| DateTime::parse_from_rfc3339(ts).ok())
-        .map(|ts| ts.with_timezone(&Utc));
+    let at = parse_timestamp(record.timestamp.as_deref());
     match record.kind.as_str() {
         "user" if !record.is_meta => {
             if record.is_compact_summary {

@@ -275,12 +275,12 @@ fn read_incremental_consumes_only_complete_lines() {
 
 #[test]
 fn record_longer_than_the_read_budget_is_skipped() {
-    let mut transcript = ClaudeTranscript::new(PathBuf::from("unused.jsonl"));
+    let mut tail = JsonlTail::new(PathBuf::from("unused.jsonl"));
     let oversized = "x".repeat(16);
     let next = r#"{"type":"user","message":{"content":"after"}}"#;
 
-    let first = transcript.consume(oversized.as_bytes(), 16);
-    let second = transcript.consume(format!("tail\n{next}\n").as_bytes(), 16);
+    let first = parse_records(&tail.consume(oversized.into_bytes(), 16));
+    let second = parse_records(&tail.consume(format!("tail\n{next}\n").into_bytes(), 16));
 
     assert_eq!(first, vec![]);
     assert_eq!(
@@ -290,7 +290,7 @@ fn record_longer_than_the_read_budget_is_skipped() {
             at: None,
         }]
     );
-    assert_eq!(transcript.offset, 16 + 5 + next.len() as u64 + 1);
+    assert_eq!(tail.offset(), 16 + 5 + next.len() as u64 + 1);
 }
 
 #[test]
