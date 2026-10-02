@@ -74,7 +74,8 @@ impl CliChatViewSettings {
             CliChatViewToggle::OpenOnSessionStart => {
                 self.open_on_session_start.toggle_and_save_value(ctx)
             }
-            CliChatViewToggle::CollapseThinking => self.collapse_thinking.toggle_and_save_value(ctx),
+            CliChatViewToggle::CollapseThinking =>
+                self.collapse_thinking.toggle_and_save_value(ctx),
             CliChatViewToggle::CollapseToolOutput => {
                 self.collapse_tool_output.toggle_and_save_value(ctx)
             }

@@ -239,17 +239,20 @@ fn malformed_lines_are_skipped() {
 #[test]
 fn read_incremental_consumes_only_complete_lines() {
     let mut file = tempfile::NamedTempFile::new().unwrap();
-    write!(
-        file,
-        "{}\n{}",
-        r#"{"type":"user","message":{"content":"first"}}"#,
-        r#"{"type":"user","message":{"content":"sec"#
+    file.write_all(
+        concat!(
+            r#"{"type":"user","message":{"content":"first"}}"#,
+            "\n",
+            r#"{"type":"user","message":{"content":"sec"#,
+        )
+        .as_bytes(),
     )
     .unwrap();
     let mut transcript = ClaudeTranscript::new(file.path().to_path_buf());
 
     let first_read = transcript.read_incremental();
-    writeln!(file, "{}", r#"ond"}}"#).unwrap();
+    file.write_all(concat!(r#"ond"}}"#, "\n").as_bytes())
+        .unwrap();
     let second_read = transcript.read_incremental();
     let third_read = transcript.read_incremental();
 
@@ -293,7 +296,9 @@ fn record_longer_than_the_read_budget_is_skipped() {
 #[test]
 fn subagent_transcript_is_found_by_parent_tool_call_id() {
     let dir = tempfile::tempdir().unwrap();
-    let session = dir.path().join("00000000-0000-4000-8000-000000000001.jsonl");
+    let session = dir
+        .path()
+        .join("00000000-0000-4000-8000-000000000001.jsonl");
     let subagents = dir
         .path()
         .join("00000000-0000-4000-8000-000000000001")
@@ -333,7 +338,9 @@ fn subagent_transcript_is_found_by_parent_tool_call_id() {
 #[test]
 fn reported_transcript_path_is_used_when_it_names_the_session() {
     let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("00000000-0000-4000-8000-000000000001.jsonl");
+    let path = dir
+        .path()
+        .join("00000000-0000-4000-8000-000000000001.jsonl");
     fs::write(&path, "").unwrap();
 
     let located = ClaudeTranscript::locate(

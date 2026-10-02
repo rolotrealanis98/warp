@@ -329,7 +329,11 @@ fn push_record_events(record: Record, events: &mut Vec<ChatEvent>) {
     }
 }
 
-fn push_assistant_blocks(blocks: Vec<Block>, at: Option<DateTime<Utc>>, events: &mut Vec<ChatEvent>) {
+fn push_assistant_blocks(
+    blocks: Vec<Block>,
+    at: Option<DateTime<Utc>>,
+    events: &mut Vec<ChatEvent>,
+) {
     for block in blocks {
         match block {
             Block::Text { text } if !text.trim().is_empty() => {

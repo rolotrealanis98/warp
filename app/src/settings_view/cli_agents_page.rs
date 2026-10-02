@@ -118,7 +118,9 @@ impl CLIAgentsPageView {
             }
             ctx.notify();
         });
-        ctx.subscribe_to_model(&CliChatViewSettings::handle(ctx), |_, _, _, ctx| ctx.notify());
+        ctx.subscribe_to_model(&CliChatViewSettings::handle(ctx), |_, _, _, ctx| {
+            ctx.notify()
+        });
 
         Self {
             page: Self::build_page(),
@@ -834,21 +836,25 @@ impl SettingsWidget for CLIAgentToolbarLayoutWidget {
 /// Rows for the CLI agent chat view (fork feature `CliAgentChatView`).
 fn cli_chat_view_widgets() -> Vec<Box<dyn SettingsWidget<View = CLIAgentsPageView>>> {
     vec![
-        Box::new(CliChatViewToggleWidget::<OpenCliChatViewOnSessionStart>::new(
-            "Open the chat view when a Claude Code session starts",
-            "third party cli coding agent claude chat view open session start default",
-            CliChatViewToggle::OpenOnSessionStart,
-        )),
+        Box::new(
+            CliChatViewToggleWidget::<OpenCliChatViewOnSessionStart>::new(
+                "Open the chat view when a Claude Code session starts",
+                "third party cli coding agent claude chat view open session start default",
+                CliChatViewToggle::OpenOnSessionStart,
+            ),
+        ),
         Box::new(CliChatViewToggleWidget::<CliChatViewCollapseThinking>::new(
             "Collapse thinking in the chat view",
             "third party cli coding agent claude chat view collapse thinking",
             CliChatViewToggle::CollapseThinking,
         )),
-        Box::new(CliChatViewToggleWidget::<CliChatViewCollapseToolOutput>::new(
-            "Collapse tool output in the chat view",
-            "third party cli coding agent claude chat view collapse tool output calls",
-            CliChatViewToggle::CollapseToolOutput,
-        )),
+        Box::new(
+            CliChatViewToggleWidget::<CliChatViewCollapseToolOutput>::new(
+                "Collapse tool output in the chat view",
+                "third party cli coding agent claude chat view collapse tool output calls",
+                CliChatViewToggle::CollapseToolOutput,
+            ),
+        ),
         Box::new(CliChatViewToggleWidget::<CliChatViewShowTimestamps>::new(
             "Show timestamps in the chat view",
             "third party cli coding agent claude chat view timestamps time",

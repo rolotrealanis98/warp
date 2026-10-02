@@ -114,7 +114,10 @@ impl ToolItem {
     /// The file an edit-like tool wrote to.
     pub(crate) fn edited_file(&self) -> Option<&str> {
         (self.kind() == ToolKind::Edit)
-            .then(|| self.input_str("file_path").or(self.input_str("notebook_path")))
+            .then(|| {
+                self.input_str("file_path")
+                    .or(self.input_str("notebook_path"))
+            })
             .flatten()
     }
 
@@ -152,13 +155,17 @@ impl ToolItem {
     }
 
     pub(crate) fn is_error(&self) -> bool {
-        self.outcome.as_ref().is_some_and(|outcome| outcome.is_error)
+        self.outcome
+            .as_ref()
+            .is_some_and(|outcome| outcome.is_error)
     }
 
     /// Only finished, successful, non-subagent calls collapse into a group;
     /// failures, pending calls and subagent threads always stay visible.
     fn is_groupable(&self) -> bool {
-        self.outcome.as_ref().is_some_and(|outcome| !outcome.is_error)
+        self.outcome
+            .as_ref()
+            .is_some_and(|outcome| !outcome.is_error)
             && self.kind() != ToolKind::Subagent
     }
 }
@@ -276,8 +283,7 @@ impl Thread {
                     // ponytail: markdown is parsed on the main thread at ingest; move it
                     // into the background read if very long sessions stall on open.
                     let markdown = parse_markdown(&text).ok().map(Arc::new);
-                    self.items
-                        .push(ChatItem::Assistant { text, markdown, at });
+                    self.items.push(ChatItem::Assistant { text, markdown, at });
                 }
                 ChatEvent::Thinking { text } => self.items.push(ChatItem::Thinking { text }),
                 ChatEvent::ToolCall {
@@ -351,7 +357,7 @@ impl Thread {
         });
         Some(ActiveTurn {
             started_at: *at,
-            last_tool: tools.clone().last().map(|tool| tool.name.clone()),
+            last_tool: tools.clone().next_back().map(|tool| tool.name.clone()),
             running_subagents: tools
                 .filter(|tool| tool.kind() == ToolKind::Subagent && tool.outcome.is_none())
                 .count(),
@@ -368,12 +374,15 @@ struct SubagentTail {
     thread: Thread,
 }
 
+/// A subagent's tool call id, its source, and the events just read from it.
+type SubagentRead = (String, Option<Box<dyn CliTranscriptSource>>, Vec<ChatEvent>);
+
 struct PollResult {
     path: Option<PathBuf>,
     reset: bool,
     source: Option<Box<dyn CliTranscriptSource>>,
     events: Vec<ChatEvent>,
-    subagents: Vec<(String, Option<Box<dyn CliTranscriptSource>>, Vec<ChatEvent>)>,
+    subagents: Vec<SubagentRead>,
 }
 
 /// Tails the transcript of the CLI agent session running in one terminal pane.
@@ -432,6 +441,21 @@ impl CliChatModel {
             });
     }
 
+    /// Feeds events as if read from the transcript (`subagent` names the
+    /// parent tool call of a subagent thread).
+    #[cfg(test)]
+    pub(crate) fn apply_for_test(&mut self, subagent: Option<&str>, events: Vec<ChatEvent>) {
+        match subagent {
+            Some(id) => {
+                self.watch_subagent(id);
+                if let Some(tail) = self.subagents.get_mut(id) {
+                    tail.thread.apply(events);
+                }
+            }
+            None => self.thread.apply(events),
+        }
+    }
+
     fn schedule_poll(&mut self, ctx: &mut ModelContext<Self>) {
         ctx.spawn(Timer::after(POLL_INTERVAL), |me, _, ctx| me.poll(ctx));
     }
@@ -484,7 +508,8 @@ impl CliChatModel {
                     subagents
                         .into_iter()
                         .map(|(id, sub_source)| {
-                            let mut sub_source = sub_source.or_else(|| source.as_ref()?.subagent(&id));
+                            let mut sub_source =
+                                sub_source.or_else(|| source.as_ref()?.subagent(&id));
                             let events = sub_source
                                 .as_mut()
                                 .map(|source| source.read_incremental())

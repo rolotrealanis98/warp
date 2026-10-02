@@ -15,18 +15,18 @@ use serde_json::Value;
 use similar::{ChangeTag, TextDiff};
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::Fill as ThemeFill;
-use warpui::fonts::FamilyId;
+use warpui::r#async::Timer;
+use warpui::clipboard::ClipboardContent;
 use warpui::elements::{
     Align, Border, ChildView, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
-    Container, CornerRadius, CrossAxisAlignment, Empty, Expanded, Fill, Flex,
-    FormattedTextElement, HighlightedHyperlink, Hoverable, MainAxisAlignment, MainAxisSize,
-    MouseStateHandle, ParentElement, Radius, SavePosition, ScrollTarget, ScrollToPositionMode,
-    ScrollbarWidth, SelectableArea, SelectionHandle, Shrinkable, Text,
+    Container, CornerRadius, CrossAxisAlignment, Empty, Expanded, Fill, Flex, FormattedTextElement,
+    HighlightedHyperlink, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
+    ParentElement, Radius, SavePosition, ScrollTarget, ScrollToPositionMode, ScrollbarWidth,
+    SelectableArea, SelectionHandle, Shrinkable, Text,
 };
-use warpui::clipboard::ClipboardContent;
+use warpui::fonts::FamilyId;
 use warpui::keymap::FixedBinding;
 use warpui::platform::Cursor;
-use warpui::r#async::Timer;
 use warpui::text_layout::ClipConfig;
 use warpui::units::Pixels;
 use warpui::{
@@ -35,8 +35,8 @@ use warpui::{
 };
 
 use super::model::{
-    ChatItem, CliChatModel, CliChatModelEvent, Row, Thread, ToolItem, ToolKind, group_label,
-    rows, turn_summary,
+    ChatItem, CliChatModel, CliChatModelEvent, Row, Thread, ToolItem, ToolKind, group_label, rows,
+    turn_summary,
 };
 use super::{CliChatViewSettings, TOGGLE_CLI_CHAT_VIEW_BINDING};
 use crate::editor::{
@@ -189,15 +189,20 @@ impl CliChatView {
                 ctx.notify();
             }
         });
-        ctx.subscribe_to_model(&CLIAgentSessionsModel::handle(ctx), move |me, _, event, ctx| {
-            if event.terminal_view_id() == terminal_view_id
-                && matches!(event, CLIAgentSessionsModelEvent::StatusChanged { .. })
-            {
-                me.ensure_ticking(ctx);
-                ctx.notify();
-            }
+        ctx.subscribe_to_model(
+            &CLIAgentSessionsModel::handle(ctx),
+            move |me, _, event, ctx| {
+                if event.terminal_view_id() == terminal_view_id
+                    && matches!(event, CLIAgentSessionsModelEvent::StatusChanged { .. })
+                {
+                    me.ensure_ticking(ctx);
+                    ctx.notify();
+                }
+            },
+        );
+        ctx.subscribe_to_model(&CliChatViewSettings::handle(ctx), |_, _, _, ctx| {
+            ctx.notify()
         });
-        ctx.subscribe_to_model(&CliChatViewSettings::handle(ctx), |_, _, _, ctx| ctx.notify());
 
         let appearance = Appearance::as_ref(ctx);
         let composer_text = TextOptions::ui_text(Some(appearance.ui_font_size() + 1.), appearance);
@@ -459,7 +464,10 @@ fn tool_diff(tool: &ToolItem) -> Option<Vec<(ChangeTag, String)>> {
             .to_owned()
     };
     let pairs: Vec<(String, String)> = match tool.name.as_str() {
-        "Edit" => vec![(str_field(input, "old_string"), str_field(input, "new_string"))],
+        "Edit" => vec![(
+            str_field(input, "old_string"),
+            str_field(input, "new_string"),
+        )],
         "MultiEdit" => input
             .get("edits")
             .and_then(Value::as_array)?
@@ -474,12 +482,16 @@ fn tool_diff(tool: &ToolItem) -> Option<Vec<(ChangeTag, String)>> {
         if !lines.is_empty() {
             lines.push((ChangeTag::Equal, "⋯".to_owned()));
         }
-        lines.extend(TextDiff::from_lines(old, new).iter_all_changes().map(|change| {
-            (
-                change.tag(),
-                change.value().trim_end_matches('\n').to_owned(),
-            )
-        }));
+        lines.extend(
+            TextDiff::from_lines(old, new)
+                .iter_all_changes()
+                .map(|change| {
+                    (
+                        change.tag(),
+                        change.value().trim_end_matches('\n').to_owned(),
+                    )
+                }),
+        );
     }
     Some(lines)
 }
@@ -564,7 +576,12 @@ fn tool_icon(kind: ToolKind) -> Icon {
 }
 
 impl CliChatView {
-    fn clickable(&self, key: &str, action: CliChatViewAction, child: Box<dyn Element>) -> Box<dyn Element> {
+    fn clickable(
+        &self,
+        key: &str,
+        action: CliChatViewAction,
+        child: Box<dyn Element>,
+    ) -> Box<dyn Element> {
         Hoverable::new(self.mouse_state(key), |_| child)
             .on_click(move |ctx, _, _| ctx.dispatch_typed_action(action.clone()))
             .with_cursor(Cursor::PointingHand)
@@ -633,14 +650,16 @@ impl CliChatView {
             .and_then(|hidden| prompts.get(hidden).copied())
             .unwrap_or(0);
         if first_visible > 0 {
-            column.add_child(self.clickable(
-                "show_earlier",
-                CliChatViewAction::ShowEarlierTurns,
-                palette
-                    .small("Show earlier turns", palette.sub)
-                    .with_selectable(false)
-                    .finish(),
-            ));
+            column.add_child(
+                self.clickable(
+                    "show_earlier",
+                    CliChatViewAction::ShowEarlierTurns,
+                    palette
+                        .small("Show earlier turns", palette.sub)
+                        .with_selectable(false)
+                        .finish(),
+                ),
+            );
         }
 
         for row in rows(items) {
@@ -731,10 +750,7 @@ impl CliChatView {
                     .register_default_click_handlers(|url, _, ctx| ctx.open_url(&url.url))
                     .set_selectable(true)
                     .finish(),
-                    None => palette
-                        .text(text.clone(), palette.text)
-                        
-                        .finish(),
+                    None => palette.text(text.clone(), palette.text).finish(),
                 };
                 match at.filter(|_| palette.show_timestamps) {
                     Some(at) => Flex::column()
@@ -770,12 +786,7 @@ impl CliChatView {
                     .with_spacing(4.)
                     .with_child(header)
                     .with_child(
-                        Container::new(
-                            palette
-                                .small(text.clone(), palette.sub)
-                                
-                                .finish(),
-                        )
+                        Container::new(palette.small(text.clone(), palette.sub).finish())
                             .with_padding_left(16.)
                             .finish(),
                     )
@@ -792,16 +803,17 @@ impl CliChatView {
         Some(element)
     }
 
-    fn render_user(&self, text: &str, at: Option<DateTime<Utc>>, palette: &Palette) -> Box<dyn Element> {
+    fn render_user(
+        &self,
+        text: &str,
+        at: Option<DateTime<Utc>>,
+        palette: &Palette,
+    ) -> Box<dyn Element> {
         let mut column = Flex::column().with_spacing(2.);
         if let Some(at) = at.filter(|_| palette.show_timestamps) {
             column.add_child(palette.small(format_time(at), palette.hint).finish());
         }
-        column.add_child(
-            palette
-                .text(text.to_owned(), palette.text)
-                .finish(),
-        );
+        column.add_child(palette.text(text.to_owned(), palette.text).finish());
         Container::new(column.finish())
             .with_background(palette.bubble)
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(8.)))
@@ -865,7 +877,8 @@ impl CliChatView {
     ) -> Box<dyn Element> {
         let key = tool_key(&tool.id);
         let is_subagent = tool.kind() == ToolKind::Subagent;
-        let expanded_by_default = !is_subagent && (tool.is_error() || !palette.collapse_tool_output);
+        let expanded_by_default =
+            !is_subagent && (tool.is_error() || !palette.collapse_tool_output);
         let expanded = self.is_expanded(&key, expanded_by_default);
         let action = if is_subagent {
             CliChatViewAction::ToggleSubagent(tool.id.clone())
@@ -894,10 +907,10 @@ impl CliChatView {
                             .with_selectable(false)
                             .finish(),
                     )
-                        .with_background(palette.bubble)
-                        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
-                        .with_horizontal_padding(4.)
-                        .finish(),
+                    .with_background(palette.bubble)
+                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                    .with_horizontal_padding(4.)
+                    .finish(),
                 );
             }
             None => header.add_child(
@@ -936,9 +949,11 @@ impl CliChatView {
             Some(_) => palette.icon(Icon::Check, palette.green, 14.),
         });
 
-        let mut card = Flex::column()
-            .with_spacing(6.)
-            .with_child(self.clickable(&key, action, header.finish()));
+        let mut card = Flex::column().with_spacing(6.).with_child(self.clickable(
+            &key,
+            action,
+            header.finish(),
+        ));
         if expanded {
             card.add_child(self.render_tool_body(tool, model, palette, app));
         }
@@ -1000,12 +1015,7 @@ impl CliChatView {
                     ChangeTag::Delete => ("-", palette.red),
                     ChangeTag::Equal => (" ", palette.sub),
                 };
-                lines.add_child(
-                    palette
-                        .mono(format!("{sign} {line}"), color)
-                        
-                        .finish(),
-                );
+                lines.add_child(palette.mono(format!("{sign} {line}"), color).finish());
             }
             if diff.len() > MAX_DIFF_LINES {
                 lines.add_child(palette.mono("… (truncated)", palette.hint).finish());
@@ -1013,43 +1023,56 @@ impl CliChatView {
             body.add_child(self.scroll_box(&format!("{}:diff", tool.id), lines.finish(), palette));
         } else if tool.kind() == ToolKind::Command {
             if let Some(command) = tool.input.get("command").and_then(Value::as_str) {
-                body.add_child(
-                    palette
-                        .mono(format!("$ {command}"), palette.text)
-                        
-                        .finish(),
-                );
+                body.add_child(palette.mono(format!("$ {command}"), palette.text).finish());
             }
-        } else if tool.input.as_object().is_some_and(|fields| !fields.is_empty()) {
+        } else if tool
+            .input
+            .as_object()
+            .is_some_and(|fields| !fields.is_empty())
+        {
             let input = serde_json::to_string_pretty(&tool.input).unwrap_or_default();
-            body.add_child(self.scroll_box(
-                &format!("{}:input", tool.id),
-                palette
-                    .mono(capped(&input, MAX_OUTPUT_CHARS).into_owned(), palette.sub)
-                    
-                    .finish(),
-                palette,
-            ));
+            body.add_child(
+                self.scroll_box(
+                    &format!("{}:input", tool.id),
+                    palette
+                        .mono(capped(&input, MAX_OUTPUT_CHARS).into_owned(), palette.sub)
+                        .finish(),
+                    palette,
+                ),
+            );
         }
         if let Some(outcome) = &tool.outcome
             && !outcome.content.trim().is_empty()
             && tool.kind() != ToolKind::Subagent
         {
-            let color = if outcome.is_error { palette.red } else { palette.text };
-            body.add_child(self.scroll_box(
-                &format!("{}:output", tool.id),
-                palette
-                    .mono(capped(&outcome.content, MAX_OUTPUT_CHARS).into_owned(), color)
-                    
-                    .finish(),
-                palette,
-            ));
+            let color = if outcome.is_error {
+                palette.red
+            } else {
+                palette.text
+            };
+            body.add_child(
+                self.scroll_box(
+                    &format!("{}:output", tool.id),
+                    palette
+                        .mono(
+                            capped(&outcome.content, MAX_OUTPUT_CHARS).into_owned(),
+                            color,
+                        )
+                        .finish(),
+                    palette,
+                ),
+            );
         }
         body.finish()
     }
 
     /// A height-capped block with its own scroll.
-    fn scroll_box(&self, key: &str, child: Box<dyn Element>, palette: &Palette) -> Box<dyn Element> {
+    fn scroll_box(
+        &self,
+        key: &str,
+        child: Box<dyn Element>,
+        palette: &Palette,
+    ) -> Box<dyn Element> {
         ConstrainedBox::new(
             Container::new(
                 ClippedScrollable::vertical(
@@ -1079,12 +1102,20 @@ impl CliChatView {
         let mut counts = vec![format!(
             "{} {} changed",
             summary.files.len(),
-            if summary.files.len() == 1 { "file" } else { "files" }
+            if summary.files.len() == 1 {
+                "file"
+            } else {
+                "files"
+            }
         )];
         counts.push(format!(
             "{} {}",
             summary.commands,
-            if summary.commands == 1 { "command" } else { "commands" }
+            if summary.commands == 1 {
+                "command"
+            } else {
+                "commands"
+            }
         ));
         let error_color = if summary.errors.is_empty() {
             palette.sub
@@ -1101,7 +1132,11 @@ impl CliChatView {
                             format!(
                                 "{} {}",
                                 summary.errors.len(),
-                                if summary.errors.len() == 1 { "error" } else { "errors" }
+                                if summary.errors.len() == 1 {
+                                    "error"
+                                } else {
+                                    "errors"
+                                }
                             ),
                             error_color,
                         )
@@ -1115,21 +1150,28 @@ impl CliChatView {
                 .file_name()
                 .map(|name| name.to_string_lossy().into_owned())
                 .unwrap_or_else(|| file.clone());
-            links.add_child(self.clickable(
-                &format!("jump:{tool_id}"),
-                CliChatViewAction::JumpToTool(tool_id.clone()),
-                palette.small(name, palette.text).with_selectable(false).finish(),
-            ));
+            links.add_child(
+                self.clickable(
+                    &format!("jump:{tool_id}"),
+                    CliChatViewAction::JumpToTool(tool_id.clone()),
+                    palette
+                        .small(name, palette.text)
+                        .with_selectable(false)
+                        .finish(),
+                ),
+            );
         }
         for tool_id in &summary.errors {
-            links.add_child(self.clickable(
-                &format!("jump:{tool_id}"),
-                CliChatViewAction::JumpToTool(tool_id.clone()),
-                palette
-                    .small("view error", palette.red)
-                    .with_selectable(false)
-                    .finish(),
-            ));
+            links.add_child(
+                self.clickable(
+                    &format!("jump:{tool_id}"),
+                    CliChatViewAction::JumpToTool(tool_id.clone()),
+                    palette
+                        .small("view error", palette.red)
+                        .with_selectable(false)
+                        .finish(),
+                ),
+            );
         }
         column.add_child(links.finish());
         Container::new(column.finish())
@@ -1144,13 +1186,15 @@ impl CliChatView {
         let text = match self.active_status(app)? {
             ActiveStatus::Blocked(message) => {
                 let message = message.unwrap_or_else(|| "Waiting for your input".to_owned());
-                return Some(self.strip(
-                    palette
-                        .small(format!("Needs you: {message}"), palette.warning)
-                        .soft_wrap(false)
-                    .with_clip(ClipConfig::ellipsis())
-                        .finish(),
-                ));
+                return Some(
+                    self.strip(
+                        palette
+                            .small(format!("Needs you: {message}"), palette.warning)
+                            .soft_wrap(false)
+                            .with_clip(ClipConfig::ellipsis())
+                            .finish(),
+                    ),
+                );
             }
             ActiveStatus::Working {
                 started_at,
@@ -1167,19 +1211,25 @@ impl CliChatView {
                 if running_subagents > 0 {
                     parts.push(format!(
                         "{running_subagents} {}",
-                        if running_subagents == 1 { "subagent" } else { "subagents" }
+                        if running_subagents == 1 {
+                            "subagent"
+                        } else {
+                            "subagents"
+                        }
                     ));
                 }
                 parts.join(" · ")
             }
         };
-        Some(self.strip(
-            palette
-                .small(text, palette.sub)
-                .soft_wrap(false)
+        Some(
+            self.strip(
+                palette
+                    .small(text, palette.sub)
+                    .soft_wrap(false)
                     .with_clip(ClipConfig::ellipsis())
-                .finish(),
-        ))
+                    .finish(),
+            ),
+        )
     }
 
     fn strip(&self, child: Box<dyn Element>) -> Box<dyn Element> {
@@ -1299,3 +1349,7 @@ impl TypedActionView for CliChatView {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "view_tests.rs"]
+mod tests;

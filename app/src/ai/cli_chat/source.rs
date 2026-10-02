@@ -13,12 +13,16 @@ pub(crate) enum ChatEvent {
     },
     /// User-side input that is not a prompt: slash commands, shell-mode
     /// input and output, interrupts, background notices.
-    Notice { text: String },
+    Notice {
+        text: String,
+    },
     AssistantText {
         text: String,
         at: Option<DateTime<Utc>>,
     },
-    Thinking { text: String },
+    Thinking {
+        text: String,
+    },
     ToolCall {
         id: String,
         name: String,
@@ -32,10 +36,15 @@ pub(crate) enum ChatEvent {
         at: Option<DateTime<Utc>>,
     },
     /// The assistant finished its turn (or the user interrupted it).
-    TurnEnded { at: Option<DateTime<Utc>> },
+    TurnEnded {
+        at: Option<DateTime<Utc>>,
+    },
     /// Session title. `is_custom` is true for a title the user set, which
     /// takes precedence over a generated one.
-    Title { text: String, is_custom: bool },
+    Title {
+        text: String,
+        is_custom: bool,
+    },
 }
 
 /// Reads a CLI agent's on-disk session transcript incrementally.

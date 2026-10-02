@@ -40,9 +40,8 @@ impl TerminalView {
         };
         let terminal_view_id = self.view_id;
         let pane_cwd = self.pwd();
-        let chat_view = ctx.add_typed_action_view(|ctx| {
-            CliChatView::new(terminal_view_id, agent, pane_cwd, ctx)
-        });
+        let chat_view = ctx
+            .add_typed_action_view(|ctx| CliChatView::new(terminal_view_id, agent, pane_cwd, ctx));
         ctx.subscribe_to_view(&chat_view, |me, _, event, ctx| {
             me.handle_cli_chat_view_event(event, ctx);
         });
@@ -68,7 +67,11 @@ impl TerminalView {
         true
     }
 
-    fn handle_cli_chat_view_event(&mut self, event: &CliChatViewEvent, ctx: &mut ViewContext<Self>) {
+    fn handle_cli_chat_view_event(
+        &mut self,
+        event: &CliChatViewEvent,
+        ctx: &mut ViewContext<Self>,
+    ) {
         match event {
             CliChatViewEvent::Submit(text) => {
                 #[cfg(feature = "local_tty")]

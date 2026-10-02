@@ -65,7 +65,10 @@ fn consecutive_successful_tools_collapse_into_a_group() {
         result("t3", false),
     ]);
 
-    assert_eq!(rows(&thread.items), vec![Row::Item(0), Row::ToolGroup(1..4)]);
+    assert_eq!(
+        rows(&thread.items),
+        vec![Row::Item(0), Row::ToolGroup(1..4)]
+    );
 }
 
 #[test]
@@ -240,7 +243,11 @@ fn mcp_tool_name_splits_into_server_and_tool() {
 #[test]
 fn tool_summary_uses_the_most_telling_input_field() {
     let thread = thread(vec![
-        call("t1", "Bash", json!({"command": "cargo test\n--quiet", "description": "Run tests"})),
+        call(
+            "t1",
+            "Bash",
+            json!({"command": "cargo test\n--quiet", "description": "Run tests"}),
+        ),
         call("t2", "TodoWrite", json!({"todos": [{}, {}]})),
         call("t3", "mcp__docs__search", json!({"query": "flags"})),
     ]);

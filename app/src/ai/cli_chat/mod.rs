@@ -20,8 +20,8 @@ use std::path::PathBuf;
 use warp_core::features::FeatureFlag;
 
 use self::claude::ClaudeTranscript;
-use self::source::CliTranscriptSource;
 pub(crate) use self::settings::*;
+use self::source::CliTranscriptSource;
 pub(crate) use self::view::{CliChatView, CliChatViewEvent};
 use crate::terminal::CLIAgent;
 
