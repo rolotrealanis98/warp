@@ -330,14 +330,16 @@ pub fn init(app: &mut AppContext) {
         // its CLI agent session. Also matches while the chat composer has focus.
         EditableBinding::new(
             crate::ai::cli_chat::TOGGLE_CLI_CHAT_VIEW_BINDING,
-            "Toggle CLI Agent Chat View",
+            BindingDescription::new("Toggle CLI Agent Chat View")
+                .with_custom_description(bindings::MAC_MENUS_CONTEXT, "Toggle chat view"),
             TerminalAction::ToggleCliChatView,
         )
         .with_key_binding("cmdorctrl-shift-L")
         .with_context_predicate(
             id!("Terminal") & !id!("IMEOpen") & id!(CLI_CHAT_VIEW_AVAILABLE_KEY),
         )
-        .with_enabled(|| FeatureFlag::CliAgentChatView.is_enabled()),
+        .with_enabled(|| FeatureFlag::CliAgentChatView.is_enabled())
+        .with_custom_action(CustomAction::ToggleCliChatView),
         EditableBinding::new(
             "terminal:warpify_subshell",
             "Warpify subshell",

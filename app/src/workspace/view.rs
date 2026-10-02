@@ -24432,6 +24432,7 @@ impl TypedActionView for Workspace {
                 self.open_pr_agent_pull_request(*terminal_view_id, ctx)
             }
             Jira(command) => self.handle_jira_command(*command, ctx),
+            NewClaudeCodeTab => self.open_claude_code_tab(ctx),
             OpenTabConfigErrorFile {
                 #[cfg_attr(not(feature = "local_fs"), allow(unused_variables))]
                 path,

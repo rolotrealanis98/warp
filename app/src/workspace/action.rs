@@ -848,6 +848,8 @@ pub enum WorkspaceAction {
     OpenPrAgentPullRequest(EntityId),
     /// A Jira command palette entry (issue picker, or a write on the active pane's issue).
     Jira(crate::jira::JiraCommand),
+    /// Open a tab in the active session's directory running Claude Code (fork).
+    NewClaudeCodeTab,
     /// Create a new worktree in the given repo using the default worktree tab config.
     /// The branch name is auto-generated.
     OpenWorktreeInRepo {
@@ -996,6 +998,7 @@ impl WorkspaceAction {
             | ToggleTabGroupColor { .. }
             | AddDefaultTab
             | AddTerminalTab { .. }
+            | NewClaudeCodeTab
             | AddTabWithShell { .. }
             | AddGetStartedTab
             | AddAgentTab

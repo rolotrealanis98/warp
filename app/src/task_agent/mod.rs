@@ -12,15 +12,15 @@ use std::path::{Path, PathBuf};
 
 pub(crate) use modal::{TaskAgentModal, TaskAgentModalEvent, TaskAgentModalMode};
 pub(crate) use session::{TaskSession, TaskSessionsModel};
-use warpui::keymap::EditableBinding;
 use warpui::keymap::macros::*;
+use warpui::keymap::{BindingDescription, EditableBinding};
 use warpui::{AppContext, SingletonEntity};
 
 use self::settings::TaskAgentSettings;
 use crate::features::FeatureFlag;
 use crate::settings_view::SettingsSection;
 use crate::terminal::CLIAgent;
-use crate::util::bindings::BindingGroup;
+use crate::util::bindings::{BindingGroup, CustomAction, MAC_MENUS_CONTEXT};
 use crate::workspace::WorkspaceAction;
 
 /// Maximum length of `{{slug}}`.
@@ -33,13 +33,23 @@ pub(crate) fn init(app: &mut AppContext) {
     let enabled = || FeatureFlag::TaskAgentLauncher.is_enabled();
     app.register_editable_bindings([
         EditableBinding::new(
+            "workspace:new_claude_code_tab",
+            "New Claude Code tab",
+            WorkspaceAction::NewClaudeCodeTab,
+        )
+        .with_group(BindingGroup::Navigation.as_str())
+        .with_context_predicate(id!("Workspace"))
+        .with_custom_action(CustomAction::NewClaudeCodeTab),
+        EditableBinding::new(
             "workspace:task_agent_start",
-            "Task agent: start on task…",
+            BindingDescription::new("Task agent: start on task…")
+                .with_custom_description(MAC_MENUS_CONTEXT, "Start agent on task…"),
             WorkspaceAction::OpenTaskAgentModal,
         )
         .with_enabled(enabled)
         .with_group(BindingGroup::Navigation.as_str())
-        .with_context_predicate(id!("Workspace")),
+        .with_context_predicate(id!("Workspace"))
+        .with_custom_action(CustomAction::StartTaskAgent),
         EditableBinding::new(
             "workspace:task_agent_rename_session",
             "Task agent: rename this session from task…",

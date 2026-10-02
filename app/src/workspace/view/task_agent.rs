@@ -19,7 +19,7 @@ use crate::task_agent::{
     Checkout, LaunchPlan, TaskAgentModal, TaskAgentModalEvent, TaskAgentModalMode,
     TaskAgentRequest, TaskSession, TaskSessionsModel, plan_launch, session_title, template_vars,
 };
-use crate::terminal::TerminalView;
+use crate::terminal::{CLIAgent, TerminalView};
 use crate::view_components::DismissibleToast;
 
 const MODAL_WIDTH: f32 = 560.;
@@ -212,6 +212,30 @@ impl Workspace {
         });
         refresh_pane_header(&terminal, ctx);
         Some(terminal)
+    }
+
+    /// Opens a tab in the active session's directory running Claude Code. Without an active
+    /// session the tab starts in the default directory.
+    pub(super) fn open_claude_code_tab(&mut self, ctx: &mut ViewContext<Self>) {
+        let cwd = self
+            .active_session_view(ctx)
+            .and_then(|view| view.as_ref(ctx).pwd_if_local(ctx).map(PathBuf::from))
+            .unwrap_or_default();
+        let pane = PaneTemplateType::PaneTemplate {
+            cwd,
+            commands: vec![CommandTemplate {
+                exec: CLIAgent::Claude.command_prefix().to_string(),
+            }],
+            is_focused: Some(true),
+            pane_mode: PaneMode::Terminal,
+            shell: None,
+        };
+        self.add_tab_with_pane_layout(
+            PanesLayout::Template(pane),
+            Arc::new(HashMap::new()),
+            None,
+            ctx,
+        );
     }
 
     /// Names the active tab after a task and records the task on its terminal pane, keeping any

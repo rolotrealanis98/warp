@@ -132,6 +132,11 @@ pub enum CustomAction {
     GoToLine,
     ToggleGlobalSearch,
     ToggleConversationListView,
+    // Fork: the "Agent" menu.
+    NewClaudeCodeTab,
+    StartTaskAgent,
+    ToggleCliChatView,
+    OpenAgentDashboard,
 }
 
 lazy_static! {
@@ -467,7 +472,11 @@ pub fn custom_tag_to_keystroke(custom: CustomTag) -> Option<Keystroke> {
         | CustomAction::OpenMCPServerCollection
         | CustomAction::NewPersonalAIPrompt
         | CustomAction::NewTeamAIPrompt
-        | CustomAction::NewAgentTab => None,
+        | CustomAction::NewAgentTab
+        | CustomAction::NewClaudeCodeTab
+        | CustomAction::StartTaskAgent
+        | CustomAction::ToggleCliChatView
+        | CustomAction::OpenAgentDashboard => None,
     }
 }
 
