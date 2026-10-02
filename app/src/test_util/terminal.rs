@@ -176,6 +176,8 @@ pub fn initialize_app_for_terminal_view(app: &mut App) {
 
     #[cfg(not(target_family = "wasm"))]
     app.add_singleton_model(SystemInfo::new);
+    // Read with `SystemInfo` when a test pane's shell exits early or fails to spawn.
+    app.add_singleton_model(crate::antivirus::AntivirusInfo::new);
 
     app.add_singleton_model(|_| RestoredAgentConversations::new_seeded(vec![]));
     app.add_singleton_model(OneTimeModalModel::new);

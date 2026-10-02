@@ -147,6 +147,11 @@ fn initialize_app_with_history(app: &mut App, conversations: Vec<AgentConversati
     app.add_singleton_model(|_ctx| PtySpawner::new_for_test());
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(|_| SystemStats::new());
+    // Read when a test pane's shell exits early or fails to spawn, which parallel test runs
+    // can cause.
+    app.add_singleton_model(crate::antivirus::AntivirusInfo::new);
+    #[cfg(not(target_family = "wasm"))]
+    app.add_singleton_model(crate::system::SystemInfo::new);
     app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(CloudModel::mock);
     app.add_singleton_model(CloudEnvironmentCatalog::new);
