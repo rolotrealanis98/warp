@@ -1532,12 +1532,13 @@ pub fn init(app: &mut AppContext) {
         WorkspaceAction::ToggleAgentManagementView,
     )
     .with_enabled(|| FeatureFlag::AgentManagementView.is_enabled())
-    .with_custom_action(CustomAction::OpenAgentDashboard)
     // Fork: available without Warp AI; the dashboard lists CLI agent sessions.
     .with_context_predicate(id!("Workspace"))
     .with_mac_key_binding("cmd-shift-M")
     .with_linux_or_windows_key_binding("ctrl-shift-M")
-    .with_group(bindings::BindingGroup::WarpAi.as_str())]);
+    .with_group(bindings::BindingGroup::WarpAi.as_str())
+    // Must come last: it sets the binding's trigger, which the Agent menu looks up.
+    .with_custom_action(CustomAction::OpenAgentDashboard)]);
 }
 
 fn add_open_setting_pages_as_editable_binding(app: &mut AppContext) {
