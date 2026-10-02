@@ -70,11 +70,10 @@ pub async fn commits_since(repo: &Path, parent: &str, branch: &str) -> Result<Ve
         .collect())
 }
 
-/// Fallback title: `KEY short title` when the branch name carries an issue
-/// key (`EXAMPLE-123-short-title`, optionally under a `prefix/`), otherwise
-/// the oldest commit subject, otherwise the branch name.
-// ponytail: parses the branch name; the task metadata from the agent
-// launcher (key + short title) should replace this once it lands.
+/// Fallback title for branches the task launcher did not start (those use
+/// the task's key and short title): `KEY short title` when the branch name
+/// carries an issue key (`EXAMPLE-123-short-title`, optionally under a
+/// `prefix/`), otherwise the oldest commit subject, otherwise the branch name.
 pub fn fallback_title(branch: &str, commits: &[CommitMessage]) -> String {
     let name = branch.rsplit('/').next().unwrap_or(branch);
     let mut parts = name.splitn(3, ['-', '_']);

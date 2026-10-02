@@ -30,7 +30,7 @@ use warpui::platform::Cursor;
 use warpui::ui_components::components::UiComponent as _;
 use warpui::{
     AppContext, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
-    ViewHandle, WeakViewHandle,
+    ViewHandle, WeakViewHandle, WindowId,
 };
 
 use super::restack::{self, RestackOutcome, conflict_handoff_message};
@@ -42,8 +42,11 @@ use super::stats::{BranchStats, ClassificationRule, Classifier, branch_stats};
 use super::status::{ChecksState, PrStatus, base_name, fetch_prs};
 use super::submit;
 use crate::appearance::Appearance;
+use crate::features::FeatureFlag;
 use crate::menu::{Event as MenuEvent, Menu, MenuItem, MenuItemFields};
 use crate::pane_group::{PaneGroup, WorkingDirectoriesEvent, WorkingDirectoriesModel};
+use crate::task_agent::settings::TaskAgentSettings;
+use crate::task_agent::{TaskSession, TaskSessionsModel, short_title};
 use crate::terminal::cli_agent_sessions::{
     CLIAgentSessionStatus, CLIAgentSessionsModel, CLIAgentSessionsModelEvent,
 };
@@ -171,6 +174,7 @@ pub struct PrStackPanel {
     refresh_state: MouseStateHandle,
     scroll_state: ClippedScrollStateHandle,
     view_id: EntityId,
+    window_id: WindowId,
 }
 
 impl PrStackPanel {
@@ -236,6 +240,7 @@ impl PrStackPanel {
             refresh_state: Default::default(),
             scroll_state: Default::default(),
             view_id: ctx.view_id(),
+            window_id: ctx.window_id(),
         }
     }
 
@@ -515,7 +520,7 @@ impl PrStackPanel {
                 self.conflicts.insert(branch.clone());
                 let text = conflict_handoff_message(&branch, &onto, &worktree, &remaining);
                 let message = if self
-                    .send_to_agent(&worktree, text.clone(), false, ctx)
+                    .send_to_agent(&worktree, Some(&branch), text.clone(), false, ctx)
                     .is_some()
                 {
                     format!("Rebase conflict on {branch}; handed off to the agent pane.")
@@ -575,7 +580,7 @@ impl PrStackPanel {
             .replace("{{branch}}", &branch);
         if title_body.is_none() && allow_prepare && !command.is_empty() {
             let dir = worktree.or_else(|| self.repo.clone()).unwrap_or_default();
-            if let Some(terminal_id) = self.send_to_agent(&dir, command, true, ctx) {
+            if let Some(terminal_id) = self.send_to_agent(&dir, Some(&branch), command, true, ctx) {
                 let timeout = ctx.spawn(Timer::after(PREPARE_TIMEOUT), |me, _, ctx| {
                     me.finish_prepare(ctx);
                 });
@@ -597,6 +602,7 @@ impl PrStackPanel {
         let repo = loaded.repo.clone();
         let stack = loaded.stack.clone();
         let prs = loaded.prs.clone();
+        let task_title = self.task_title(&branch, ctx);
         let path_env = interactive_path(ctx);
         ctx.spawn(
             async move {
@@ -607,6 +613,7 @@ impl PrStackPanel {
                     &prs,
                     &branch,
                     title_body,
+                    task_title,
                     path_env.as_deref(),
                 )
                 .await
@@ -673,19 +680,69 @@ impl PrStackPanel {
         }
     }
 
-    /// Picks the CLI agent pane for work in `dir`: the focused pane, else any
-    /// agent pane inside `dir`, else any agent pane inside the repo.
-    // ponytail: matches agent panes in the active tab by working directory.
-    // The agent launcher's per-tab task metadata (branch <-> pane) should
-    // replace this lookup once it lands.
-    fn agent_terminal(&self, dir: &Path, ctx: &AppContext) -> Option<ViewHandle<TerminalView>> {
+    /// Terminal panes in this window that the task launcher started on a
+    /// branch, with their task.
+    fn task_terminals(&self, ctx: &AppContext) -> Vec<(ViewHandle<TerminalView>, TaskSession)> {
+        if !FeatureFlag::TaskAgentLauncher.is_enabled()
+            || !ctx.has_singleton_model::<TaskSessionsModel>()
+        {
+            return Vec::new();
+        }
+        let tasks = TaskSessionsModel::as_ref(ctx);
+        ctx.views_of_type::<TerminalView>(self.window_id)
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|terminal| {
+                let task = tasks.get(terminal.id())?.clone();
+                task.branch.is_some().then_some((terminal, task))
+            })
+            .collect()
+    }
+
+    /// `KEY short title` of the task the launcher started on `branch`.
+    fn task_title(&self, branch: &str, ctx: &AppContext) -> Option<String> {
+        let (_, task) = self
+            .task_terminals(ctx)
+            .into_iter()
+            .find(|(_, task)| task.branch.as_deref() == Some(branch))?;
+        let max_chars = *TaskAgentSettings::as_ref(ctx).short_title_max_chars;
+        let short = short_title(&task.title, max_chars);
+        Some(match task.key {
+            Some(key) => format!("{key} {short}"),
+            None => short,
+        })
+    }
+
+    /// Picks the CLI agent pane for `branch`: the pane the task launcher tied
+    /// to it, else (for panes started by hand) the focused agent pane inside
+    /// `dir`, any agent pane inside `dir`, or any agent pane inside the repo
+    /// in the active tab.
+    fn agent_terminal(
+        &self,
+        dir: &Path,
+        branch: Option<&str>,
+        ctx: &AppContext,
+    ) -> Option<ViewHandle<TerminalView>> {
+        let sessions = CLIAgentSessionsModel::as_ref(ctx);
+        let has_agent =
+            |terminal: &ViewHandle<TerminalView>| sessions.session(terminal.id()).is_some();
+        if let Some(branch) = branch
+            && let Some((terminal, _)) =
+                self.task_terminals(ctx)
+                    .into_iter()
+                    .find(|(terminal, task)| {
+                        task.branch.as_deref() == Some(branch) && has_agent(terminal)
+                    })
+        {
+            return Some(terminal);
+        }
+
         let pane_group = self.pane_group.as_ref()?.upgrade(ctx)?;
         let pane_group = pane_group.as_ref(ctx);
-        let sessions = CLIAgentSessionsModel::as_ref(ctx);
         let agents: Vec<ViewHandle<TerminalView>> = pane_group
             .terminal_views(ctx)
             .into_iter()
-            .filter(|terminal| sessions.session(terminal.id()).is_some())
+            .filter(has_agent)
             .collect();
         let inside = |terminal: &ViewHandle<TerminalView>, dir: &Path| {
             terminal
@@ -707,17 +764,18 @@ impl PrStackPanel {
             .or_else(|| repo.and_then(|repo| agents.iter().find(|a| inside(a, &repo)).cloned()))
     }
 
-    /// Sends `text` to the agent pane for `dir` and returns that pane. With
+    /// Sends `text` to the agent pane for `branch` / `dir` and returns that pane. With
     /// `submit`, text written straight to the agent is also submitted; text
     /// that lands in the rich input waits for the user.
     fn send_to_agent(
         &self,
         dir: &Path,
+        branch: Option<&str>,
         text: String,
         submit: bool,
         ctx: &mut ViewContext<Self>,
     ) -> Option<EntityId> {
-        let terminal = self.agent_terminal(dir, ctx)?;
+        let terminal = self.agent_terminal(dir, branch, ctx)?;
         let routing = terminal.update(ctx, |terminal, ctx| {
             let routing = terminal.try_send_text_to_cli_agent_or_rich_input(text, ctx);
             if submit && matches!(routing, Some(CliAgentRouting::Pty)) {
@@ -1022,6 +1080,7 @@ async fn submit_branch(
     prs: &HashMap<String, PrStatus>,
     branch: &str,
     title_body: Option<(String, String)>,
+    task_title: Option<String>,
     path_env: Option<&str>,
 ) -> Result<SubmitOutcome> {
     let index = stack
@@ -1044,7 +1103,7 @@ async fn submit_branch(
         None => {
             let commits = submit::commits_since(repo, parent, branch).await?;
             (
-                submit::fallback_title(branch, &commits),
+                task_title.unwrap_or_else(|| submit::fallback_title(branch, &commits)),
                 submit::fallback_body(&commits),
             )
         }
@@ -1257,6 +1316,11 @@ impl PrStackPanel {
             indices.reverse();
         }
 
+        let task_keys: HashMap<String, String> = self
+            .task_terminals(app)
+            .into_iter()
+            .filter_map(|(_, task)| Some((task.branch?, task.key?)))
+            .collect();
         let mut rows = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
         for index in indices {
             let branch = &loaded.stack.branches[index];
@@ -1266,8 +1330,15 @@ impl PrStackPanel {
             let (chip, chip_color) =
                 pr_chip(pr, theme.ansi_fg_red(), theme.ansi_fg_green(), sub_color);
             let is_top = branch.name == loaded.top;
-            let name = branch.name.clone();
-            let state = self.row_states.get(&name).cloned().unwrap_or_default();
+            let name = match task_keys.get(&branch.name) {
+                Some(key) => format!("{key} · {}", branch.name),
+                None => branch.name.clone(),
+            };
+            let state = self
+                .row_states
+                .get(&branch.name)
+                .cloned()
+                .unwrap_or_default();
             let hover_fill = internal_colors::fg_overlay_2(theme);
             let warning = theme.ansi_fg_yellow();
             let error = theme.ansi_fg_red();

@@ -99,8 +99,12 @@ the checked-out branch and the local branches below it down to the target
 - Create PR reads the title (first line) and body from `pr_body_file_template`
   (default `.git/warp-pr/{{branch}}.md`). If missing and `pr_prepare_command`
   is set, that text is sent to the branch's agent pane and Warp waits for the
-  agent to stop; otherwise a template from the commit messages is used. A
-  stack footer is kept up to date in every open PR of the stack.
+  agent to stop; otherwise a template is used: title `KEY short title` from
+  the task (or the branch name / first commit), body from the commit
+  messages. A stack footer is kept up to date in every open PR of the stack.
+- "The branch's agent pane" is the pane the task agent launcher started on
+  that branch; for panes started by hand, the agent pane working in the
+  branch's worktree (or the repo) in the active tab.
 - Restacks rebase with `git rebase --onto`, force-push (with lease) branches
   that have PRs, and retarget a PR whose parent merged. Conflicts stop the run
   and the hand-off is sent to the agent pane; nothing is resolved by Warp.
