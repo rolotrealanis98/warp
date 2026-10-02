@@ -235,6 +235,34 @@ fn here_plan_only_starts_the_agent() {
 }
 
 #[test]
+fn checkout_commands_run_after_the_checkout_and_before_push_and_setup() {
+    let request = TaskAgentRequest {
+        checkout_commands: vec!["gh pr checkout 12".to_string()],
+        prompt: String::new(),
+        ..request(Checkout::Branch {
+            base: "main".to_string(),
+        })
+    };
+    let config = TaskAgentConfig {
+        fetch_before_branch: false,
+        ..config()
+    };
+
+    let plan = plan_launch(&request, &config);
+
+    assert_eq!(
+        plan.commands,
+        vec![
+            "git switch -c feat/EXAMPLE-123-fix-login-redirect main",
+            "gh pr checkout 12",
+            "git push -u origin feat/EXAMPLE-123-fix-login-redirect || true",
+            "make deps",
+            "claude",
+        ]
+    );
+}
+
+#[test]
 fn agent_without_prompt_argument_gets_prompt_after_start() {
     let request = TaskAgentRequest {
         cli: CLIAgent::Gemini,

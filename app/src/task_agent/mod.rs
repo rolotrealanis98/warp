@@ -101,6 +101,9 @@ pub(crate) struct TaskAgentRequest {
     pub prompt: String,
     /// Run the repository's setup commands. Ignored for [`Checkout::Here`].
     pub run_setup: bool,
+    /// Commands run inside the checkout right after it exists, before the push and the setup
+    /// commands (e.g. `gh pr checkout` to put a pull request's head on the new branch).
+    pub checkout_commands: Vec<String>,
 }
 
 impl TaskAgentRequest {
@@ -111,7 +114,8 @@ impl TaskAgentRequest {
         Self::with_cli(repo_root, cli)
     }
 
-    fn with_cli(repo_root: PathBuf, cli: CLIAgent) -> Self {
+    /// Like [`Self::draft`], with an explicit CLI and no settings lookup.
+    pub(crate) fn with_cli(repo_root: PathBuf, cli: CLIAgent) -> Self {
         Self {
             title: String::new(),
             key: None,
@@ -126,6 +130,7 @@ impl TaskAgentRequest {
             cli,
             prompt: String::new(),
             run_setup: true,
+            checkout_commands: Vec::new(),
         }
     }
 }
@@ -225,6 +230,7 @@ pub(crate) fn plan_launch(request: &TaskAgentRequest, config: &TaskAgentConfig) 
             (Some(branch), None, request.repo_root.clone(), commands)
         }
     };
+    commands.extend(request.checkout_commands.iter().cloned());
 
     if let Some(branch) = &branch {
         if config.push_on_create {
@@ -299,7 +305,12 @@ pub(crate) fn resolve_branch(
 pub(crate) fn render_prompt(template: &str, request: &TaskAgentRequest, branch: &str) -> String {
     let mut vars = template_vars(request, usize::MAX);
     vars.insert("branch".to_string(), branch.to_string());
-    let rendered = handlebars::render_template(template, &vars);
+    render_paragraphs(template, &vars)
+}
+
+/// Renders `template` with `vars`, dropping empty paragraphs left by unset variables.
+pub(crate) fn render_paragraphs(template: &str, vars: &HashMap<String, String>) -> String {
+    let rendered = handlebars::render_template(template, vars);
     rendered
         .split("\n\n")
         .map(|paragraph| paragraph.trim_matches('\n'))

@@ -140,8 +140,12 @@ impl Workspace {
     }
 
     /// Writes the prompt file, opens a tab running the plan's commands, and records the task on
-    /// the new terminal pane.
-    pub(crate) fn launch_task_agent(&mut self, plan: LaunchPlan, ctx: &mut ViewContext<Self>) {
+    /// the new terminal pane, which it returns.
+    pub(crate) fn launch_task_agent(
+        &mut self,
+        plan: LaunchPlan,
+        ctx: &mut ViewContext<Self>,
+    ) -> Option<ViewHandle<TerminalView>> {
         if let Some((path, contents)) = &plan.prompt_file {
             let written = path
                 .parent()
@@ -157,7 +161,7 @@ impl Workspace {
                         ctx,
                     );
                 });
-                return;
+                return None;
             }
         }
 
@@ -188,7 +192,7 @@ impl Workspace {
             .active_session_view(ctx)
         else {
             log::warn!("Task agent tab opened without a terminal pane");
-            return;
+            return None;
         };
         let terminal_view_id = terminal.id();
         TaskSessionsModel::handle(ctx).update(ctx, |sessions, _| {
@@ -198,6 +202,7 @@ impl Workspace {
             }
         });
         refresh_pane_header(&terminal, ctx);
+        Some(terminal)
     }
 
     /// Names the active tab after a task and records the task on its terminal pane, keeping any
