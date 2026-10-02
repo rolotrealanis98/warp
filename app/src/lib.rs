@@ -75,6 +75,7 @@ mod shell_indicator;
 mod suggestions;
 mod system;
 mod tab;
+mod task_agent;
 #[cfg(test)]
 mod test_util;
 mod throttle;
@@ -2120,6 +2121,7 @@ pub(crate) fn initialize_app(
     billing::shared_objects_creation_denied_modal::init(ctx);
     tab_configs::new_worktree_modal::init(ctx);
     tab_configs::params_modal::init(ctx);
+    task_agent::init(ctx);
     ai::blocklist::init(ctx);
     ai::blocklist::block::status_bar::init(ctx);
     drive::index::init(ctx);
@@ -2267,6 +2269,7 @@ pub(crate) fn initialize_app(
     // loads metadata.
     ctx.add_singleton_model(|_| RestoredAgentConversations::new());
     ctx.add_singleton_model(|_| CLIAgentSessionsModel::new());
+    ctx.add_singleton_model(task_agent::TaskSessionsModel::new);
     // ActiveAgentViewsModel is used to track active agent conversations and notify listeners when they change.
     ctx.add_singleton_model(|_| ActiveAgentViewsModel::new());
     ctx.add_singleton_model(AgentNotificationsModel::new);

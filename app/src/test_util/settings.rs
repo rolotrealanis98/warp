@@ -108,6 +108,7 @@ pub fn initialize_settings_for_tests_with_mode(
         WarpifySettings::register(ctx);
     });
     SessionSettings::register(app);
+    crate::task_agent::settings::TaskAgentSettings::register(app);
     SshSettings::register(app);
     TabSettings::register(app);
     TerminalSettings::register(app);
