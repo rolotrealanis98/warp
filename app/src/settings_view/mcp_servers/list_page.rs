@@ -70,7 +70,8 @@ use crate::workflows::local_workflows::tail_command_for_shell;
 use crate::workspace::Workspace;
 use crate::workspaces::user_workspaces::UserWorkspaces;
 
-const DESCRIPTION_TEXT: &str = "Add MCP servers to extend the Warp Agent's capabilities. MCP servers expose data sources or tools to agents through a standardized interface, essentially acting like plugins. Add a custom server, or use the presets to get started with popular servers. You can also find team servers that have been shared with you here. ";
+// Fork: no "Warp Agent" in the copy; this fork has no native agent.
+const DESCRIPTION_TEXT: &str = "MCP servers expose data sources or tools to agents through a standardized interface, essentially acting like plugins. Add a custom server, or use the presets to get started with popular servers. You can also find team servers that have been shared with you here. ";
 
 #[derive(Debug, Clone)]
 pub enum MCPServersListPageViewEvent {

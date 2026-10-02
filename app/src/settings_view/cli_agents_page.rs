@@ -1,4 +1,4 @@
-//! The "Third party CLI agents" settings page, shown under the Agents umbrella.
+//! The "CLI agents" settings page, shown under the Agents umbrella.
 //!
 //! Everything on this page controls third-party coding agents (Claude Code,
 //! Codex, Gemini CLI) rather than Warp's own AI, so its settings are always
@@ -56,7 +56,7 @@ use crate::view_components::dropdown::DropdownAction;
 use crate::view_components::{Dropdown, SubmittableTextInput, SubmittableTextInputEvent};
 use crate::{TelemetryEvent, send_telemetry_from_ctx};
 
-const PAGE_TITLE: &str = "Third party CLI agents";
+const PAGE_TITLE: &str = "CLI agents";
 
 pub struct CLIAgentsPageView {
     page: PageType<Self>,

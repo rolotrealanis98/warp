@@ -99,7 +99,7 @@ fn subpage_display_names_are_correct() {
     assert_eq!(SettingsSection::Knowledge.to_string(), "Knowledge");
     assert_eq!(
         SettingsSection::ThirdPartyCLIAgents.to_string(),
-        "Third party CLI agents"
+        "CLI agents"
     );
     assert_eq!(
         SettingsSection::CodeIndexing.to_string(),
@@ -157,8 +157,11 @@ const ALL_SECTIONS: &[SettingsSection] = &[
 /// Sections whose user-facing Display label has deliberately diverged from the
 /// slug it was seeded from, because the slug is a stored contract that the
 /// rename must not follow.
-const SECTIONS_WITH_RENAMED_DISPLAY_LABELS: &[SettingsSection] =
-    &[SettingsSection::WarpCloudAgentAPIKeys];
+// Fork: the CLI agents page dropped "Third party" from its label.
+const SECTIONS_WITH_RENAMED_DISPLAY_LABELS: &[SettingsSection] = &[
+    SettingsSection::WarpCloudAgentAPIKeys,
+    SettingsSection::ThirdPartyCLIAgents,
+];
 
 #[test]
 fn all_sections_list_is_exhaustive() {
@@ -249,6 +252,14 @@ fn renamed_sections_keep_the_slug_they_were_seeded_with() {
     assert_eq!(
         SettingsSection::WarpCloudAgentAPIKeys.slug(),
         "Oz Cloud API Keys"
+    );
+}
+
+#[test]
+fn renamed_cli_agents_section_keeps_its_slug() {
+    assert_eq!(
+        SettingsSection::ThirdPartyCLIAgents.slug(),
+        "Third party CLI agents"
     );
 }
 

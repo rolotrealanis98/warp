@@ -367,7 +367,7 @@ impl Display for SettingsSection {
             SettingsSection::AgentProfiles => write!(f, "Profiles"),
             SettingsSection::AgentMCPServers => write!(f, "MCP servers"),
             SettingsSection::Knowledge => write!(f, "Knowledge"),
-            SettingsSection::ThirdPartyCLIAgents => write!(f, "Third party CLI agents"),
+            SettingsSection::ThirdPartyCLIAgents => write!(f, "CLI agents"),
             SettingsSection::TaskAgents => write!(f, "Task agents"),
             SettingsSection::PrAgent => write!(f, "PR agent"),
             SettingsSection::Jira => write!(f, "Jira"),
@@ -471,6 +471,20 @@ impl SettingsSection {
         };
         Some(section)
     }
+}
+
+/// Fork: settings pages for Warp's native agent, its cloud platform and billing. This fork
+/// has no native agent, so these pages are not part of the settings view.
+fn is_native_agent_section(section: SettingsSection) -> bool {
+    matches!(
+        section,
+        SettingsSection::WarpAgent
+            | SettingsSection::AgentProfiles
+            | SettingsSection::Knowledge
+            | SettingsSection::BillingAndUsage
+            | SettingsSection::CloudEnvironments
+            | SettingsSection::WarpCloudAgentAPIKeys
+    )
 }
 
 /// Resolves a stable, friendly deeplink slug (used by
@@ -1452,6 +1466,9 @@ impl SettingsView {
             SettingsPage::new(privacy_page_handle),
             SettingsPage::new(about_page_handle),
         ]);
+        // Fork: pages that only serve Warp's native agent are never built into the view, so
+        // the sidebar, search and navigation all skip them.
+        settings_pages.retain(|page| !is_native_agent_section(page.section));
 
         // Build sidebar nav items. Umbrellas group their subpages here and
         // nowhere else, so this list is the only place membership is declared.
@@ -1532,6 +1549,7 @@ impl SettingsView {
             Some(SettingsSection::PrStack) if !FeatureFlag::PrStackView.is_enabled() => {
                 SettingsSection::Account
             }
+            Some(section) if is_native_agent_section(section) => SettingsSection::Account,
             other => other.unwrap_or_default(),
         };
 

@@ -1634,14 +1634,16 @@ fn add_open_setting_pages_as_editable_binding(app: &mut AppContext) {
         )
         .with_enabled(|| FeatureFlag::AgentMode.is_enabled())
         .with_group(bindings::BindingGroup::Settings.as_str())
-        .with_context_predicate(id!("Workspace")),
+        // Fork: the page is not part of the settings view (no native agent).
+        .with_context_predicate(id!("Workspace") & id!(flags::IS_ANY_AI_ENABLED)),
         EditableBinding::new(
             "workspace:show_settings_billing_and_usage_page",
             BindingDescription::new("Open Settings: Billing and usage"),
             WorkspaceAction::ShowSettingsPage(SettingsSection::BillingAndUsage),
         )
         .with_group(bindings::BindingGroup::Settings.as_str())
-        .with_context_predicate(id!("Workspace")),
+        // Fork: the page is not part of the settings view (no native agent).
+        .with_context_predicate(id!("Workspace") & id!(flags::IS_ANY_AI_ENABLED)),
         EditableBinding::new(
             "workspace:show_settings_code_page",
             BindingDescription::new("Open Settings: Code"),
@@ -1662,7 +1664,8 @@ fn add_open_setting_pages_as_editable_binding(app: &mut AppContext) {
             WorkspaceAction::ShowSettingsPage(SettingsSection::CloudEnvironments),
         )
         .with_group(bindings::BindingGroup::Settings.as_str())
-        .with_context_predicate(id!("Workspace")),
+        // Fork: the page is not part of the settings view (no native agent).
+        .with_context_predicate(id!("Workspace") & id!(flags::IS_ANY_AI_ENABLED)),
         EditableBinding::new(
             "workspace:show_mcp_servers_settings_page",
             BindingDescription::new("Open Settings: MCP Servers"),
