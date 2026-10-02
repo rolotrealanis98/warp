@@ -64,6 +64,8 @@ pub struct CLIAgentSessionContext {
     pub summary: Option<String>,
     pub query: Option<String>,
     pub response: Option<String>,
+    /// Path of the agent's session transcript, when the plugin reports it.
+    pub transcript_path: Option<String>,
 }
 
 /// State of the rich input editor for composing a prompt to send to a CLI agent.
@@ -205,6 +207,11 @@ impl CLIAgentSession {
             .session_id
             .clone()
             .or(self.session_context.session_id.take());
+        self.session_context.transcript_path = event
+            .payload
+            .transcript_path
+            .clone()
+            .or(self.session_context.transcript_path.take());
 
         let new_status = match &event.event {
             CLIAgentEventType::PromptSubmit => {
