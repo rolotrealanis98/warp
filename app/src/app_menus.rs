@@ -532,6 +532,12 @@ fn make_agent_menu(ctx: &AppContext) -> Menu {
             ctx,
         ));
     }
+    if FeatureFlag::PrReviewAgent.is_enabled() {
+        items.push(updateable_custom_item_without_checkmark(
+            CustomAction::ReviewPullRequest,
+            ctx,
+        ));
+    }
     if FeatureFlag::AgentManagementView.is_enabled() {
         items.extend([
             MenuItem::Separator,

@@ -136,6 +136,7 @@ pub enum CustomAction {
     NewClaudeCodeTab,
     StartTaskAgent,
     ToggleCliChatView,
+    ReviewPullRequest,
     OpenAgentDashboard,
 }
 
@@ -476,6 +477,7 @@ pub fn custom_tag_to_keystroke(custom: CustomTag) -> Option<Keystroke> {
         | CustomAction::NewClaudeCodeTab
         | CustomAction::StartTaskAgent
         | CustomAction::ToggleCliChatView
+        | CustomAction::ReviewPullRequest
         | CustomAction::OpenAgentDashboard => None,
     }
 }

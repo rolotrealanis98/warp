@@ -23,8 +23,8 @@ pub(crate) use modal::{PrAgentModal, PrAgentModalEvent};
 pub(crate) use model::{PrAgentModel, PrWatchRequest};
 pub(crate) use parse::{PrRef, parse_pr_ref};
 use serde::Deserialize;
-use warpui::keymap::EditableBinding;
 use warpui::keymap::macros::*;
+use warpui::keymap::{BindingDescription, EditableBinding};
 use warpui::{AppContext, SingletonEntity};
 
 use self::mirror::Login;
@@ -34,7 +34,7 @@ use crate::task_agent::settings::TaskAgentSettings;
 use crate::task_agent::{
     Checkout, TaskAgentConfig, TaskAgentRequest, plan_launch, render_paragraphs, short_title,
 };
-use crate::util::bindings::BindingGroup;
+use crate::util::bindings::{BindingGroup, CustomAction, MAC_MENUS_CONTEXT};
 use crate::workspace::WorkspaceAction;
 
 /// Longest a single `gh` call may take before it counts as failed.
@@ -47,12 +47,14 @@ pub(crate) fn init(app: &mut AppContext) {
     modal::init(app);
     app.register_editable_bindings([EditableBinding::new(
         "workspace:pr_agent_review",
-        "PR agent: review pull request…",
+        BindingDescription::new("PR agent: review pull request…")
+            .with_custom_description(MAC_MENUS_CONTEXT, "Review pull request…"),
         WorkspaceAction::OpenPrAgentModal,
     )
     .with_enabled(|| FeatureFlag::PrReviewAgent.is_enabled())
     .with_group(BindingGroup::Navigation.as_str())
-    .with_context_predicate(id!("Workspace"))]);
+    .with_context_predicate(id!("Workspace"))
+    .with_custom_action(CustomAction::ReviewPullRequest)]);
 }
 
 /// Where the pull request is checked out.

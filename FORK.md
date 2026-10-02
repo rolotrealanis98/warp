@@ -211,12 +211,14 @@ This fork has no native Warp agent; agent surfaces are driven by CLI agents
   feature-intro modals. The stored `agents.warp_agent.is_any_ai_enabled`
   setting now defaults to `false`, has no effect, and onboarding never sets it.
 - Settings: no Warp Agent, Profiles, Knowledge, Billing and usage, or Cloud
-  platform (Environments, API keys) pages. **Agents** holds **CLI agents**,
-  **MCP servers** and **Task agents**.
+  platform (Environments, API keys) pages. **Agents** holds **MCP servers**,
+  **CLI agents**, **Task agents** and **PR agent**.
 - Menu bar: the **AI** menu is replaced by **Agent**: New Claude Code tab (a
   tab in the current directory running `claude`), Start agent on task…, Toggle
-  chat view, Open agent dashboard. **File > New Claude Code tab** replaces New
-  Agent Tab, and the Drive menu drops prompts, rules and MCP servers.
+  chat view, Review pull request…, Open agent dashboard. **File > New Claude
+  Code tab** replaces New Agent Tab, and the Drive menu drops prompts, rules
+  and MCP servers. Other "new agent tab" entry points (palette, deeplinks,
+  warpctrl) open a Claude Code tab too.
 - One-time modals that promote Warp's agent (Oz, Warp Agent CLI,
   orchestration, open-source announcement, ChatGPT plan) never open, and the
   plan offer after sign-up is skipped.
