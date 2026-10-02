@@ -1,7 +1,7 @@
 # About this fork
 
 This is a personal fork of [Warp](https://github.com/warpdotdev/warp) focused on
-third-party CLI coding agents (Claude Code first; Codex and Copilot CLI later).
+third-party CLI coding agents (Claude Code first, plus Codex and Copilot CLI).
 Everything added here is opt-in configuration that any user can enable. No
 private data, prompts, or credentials live in this repository.
 
@@ -20,19 +20,29 @@ Cargo feature `fork_features` turns them all on and is part of `default`.
 
 ### CLI agent chat view
 
-While Claude Code runs in a pane, switch that pane to a chat rendering with
-`Cmd/Ctrl-Shift-L`, the **Chat** button in the CLI agent footer, or the pane
-header menu. The chat is read from Claude Code's own session transcript
-(`~/.claude/projects/...`, or `$CLAUDE_CONFIG_DIR`); the composer and the key
-strip write to the same PTY, so the session keeps running unchanged. The
-**Terminal** button (or the same shortcut) switches back. The transcript path
-is found most reliably with the Warp plugin for Claude Code installed.
+While a supported CLI agent runs in a pane, switch that pane to a chat
+rendering with `Cmd/Ctrl-Shift-L`, the **Chat** button in the CLI agent footer,
+or the pane header menu. The chat is read from the agent's own session
+transcript; the composer and the key strip write to the same PTY, so the
+session keeps running unchanged. The **Terminal** button (or the same shortcut)
+switches back.
+
+| Agent | Transcript | How the pane finds it |
+|-------|------------|-----------------------|
+| Claude Code | `~/.claude/projects/<cwd>/<session>.jsonl` (or `$CLAUDE_CONFIG_DIR`) | Path or session id from the Warp plugin; else the newest transcript for the pane's directory. |
+| Codex | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` (or `$CODEX_HOME`) | Path or session id from the Codex plugin; else the newest rollout whose session started in the pane's directory and was written since the `codex` command started. |
+| Copilot CLI | `~/.copilot/session-state/<session>/events.jsonl` (or `$COPILOT_HOME`) | The newest session whose `workspace.yaml` names the pane's directory and was written since the `copilot` command started, preferring sessions Copilot lists as open. |
+
+Without a session id, two sessions of the same agent in the same directory can
+be confused; the newest one wins. Copilot permission prompts show in the chat
+as highlighted "Permission" items and in the status strip; answer them with
+the key strip or in the terminal.
 
 Settings (Settings > Agents > CLI agents, or `settings.toml`):
 
 | Key | Default | Meaning |
 |-----|---------|---------|
-| `cli_chat_view.open_on_session_start` | `false` | Switch to the chat view when a Claude Code session starts. |
+| `cli_chat_view.open_on_session_start` | `false` | Switch to the chat view when a supported agent session starts. |
 | `cli_chat_view.collapse_thinking` | `true` | Thinking blocks start collapsed. |
 | `cli_chat_view.collapse_tool_output` | `true` | Successful tool calls start collapsed. |
 | `cli_chat_view.show_timestamps` | `false` | Show message times. |
