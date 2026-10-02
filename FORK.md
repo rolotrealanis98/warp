@@ -133,6 +133,42 @@ cargo build -p warp --no-default-features --features "<upstream default list>"
 
 or disable a single feature by removing it from `fork_features` in `app/Cargo.toml`.
 
+### Jira
+
+Set up in Settings > Agents > Jira: site URL (`https://example.atlassian.net`),
+account email, and an API token from your Atlassian account settings. The token
+is stored in the OS keychain (key `jira_api_token`), never in the settings
+file. **Test connection** checks all three; **Clear token** removes it.
+
+Command palette:
+
+- **Jira: start agent on issue…** opens the issue picker; Enter fetches the
+  issue and opens the task agent form prefilled with key, summary, description
+  (converted to markdown), issue link and branch type.
+- **Jira: rename this session from issue…** names the current tab after an issue
+  (through the task agent rename form).
+- **Jira: open issue in browser…** and **Jira: copy issue key…**.
+- **Jira: transition…** and **Jira: add comment…** act on the issue key of the
+  current pane (a task agent session or a renamed one). These are the only
+  writes; nothing is written to Jira when an agent starts.
+
+The picker lists the default query and filters it as you type. Start the query
+with `jql:` and press Enter to search Jira instead, e.g.
+`jql: project = EXAMPLE AND status = "To Do"`. Typing a key that is not in the
+list (`EXAMPLE-123`) and pressing Enter opens that issue.
+
+Settings (`jira.*` in `settings.toml`, never synced):
+
+| Key | Default |
+|-----|---------|
+| `site_url` | empty |
+| `email` | empty |
+| `default_jql` | `assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC` |
+| `project_keys` | `[]` (all projects; otherwise `project in (...)` is added to the default query) |
+| `issue_type_to_branch_type` | `Bug = "fix"`, `Story = "feat"`, `Task = "feat"`; other types use `feat` |
+
+The branch type feeds `{{type}}` in `task_agents.branch_template`.
+
 ## PR stack view
 
 Left panel > branch icon. Shows the stack under the focused terminal's repo:
