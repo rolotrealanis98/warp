@@ -212,7 +212,7 @@ This fork has no native Warp agent; agent surfaces are driven by CLI agents
   setting now defaults to `false`, has no effect, and onboarding never sets it.
 - Settings: no Warp Agent, Profiles, Knowledge, Billing and usage, or Cloud
   platform (Environments, API keys) pages. **Agents** holds **MCP servers**,
-  **CLI agents**, **Task agents** and **PR agent**.
+  **CLI agents**, **Task agents**, **PR agent** and **Jira**.
 - Menu bar: the **AI** menu is replaced by **Agent**: New Claude Code tab (a
   tab in the current directory running `claude`), Start agent on task…, Toggle
   chat view, Review pull request…, Open agent dashboard. **File > New Claude
