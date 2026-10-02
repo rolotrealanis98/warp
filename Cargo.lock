@@ -7407,6 +7407,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "jira_client"
+version = "0.0.0"
+dependencies = [
+ "chrono",
+ "http_client",
+ "reqwest",
+ "serde_json",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "jni"
 version = "0.22.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -15354,6 +15365,7 @@ dependencies = [
  "jaq-all",
  "jaq-json",
  "jemalloc_pprof",
+ "jira_client",
  "js-sys",
  "jsonschema",
  "kmeans_colors",

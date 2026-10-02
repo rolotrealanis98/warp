@@ -119,6 +119,7 @@ image.workspace = true
 infer = "0.19.0"
 jaq-json.workspace = true
 jaq-all.workspace = true
+jira_client.workspace = true
 # Built WITHOUT the `symbolize` feature: `dump_pprof()` then returns a raw
 # pprof (sample addresses + mappings + GNU build-id), which is symbolized
 # offline against the debug-info file uploaded to Sentry by the release
