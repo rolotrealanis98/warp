@@ -13,11 +13,13 @@ use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::blocklist::{InputConfig, SerializedBlockListItem};
 use crate::code::editor_management::CodeSource;
 use crate::drive::OpenWarpDriveObjectSettings;
+use crate::pr_agent::PrWatchSnapshot;
 use crate::root_view::quake_mode_window_id;
 use crate::server::ids::{ServerId, SyncId};
 use crate::settings_view::SettingsSection;
 use crate::settings_view::environments_page::EnvironmentsPage;
 use crate::tab::SelectedTabColor;
+use crate::task_agent::TaskSession;
 use crate::terminal::ShellLaunchData;
 use crate::themes::theme::AnsiColorIdentifier;
 use crate::workspace::WorkspaceRegistry;
@@ -216,6 +218,13 @@ pub struct TerminalPaneSnapshot {
     /// The active conversation ID if the agent view was open in fullscreen mode.
     /// When `Some`, the agent view should be restored to fullscreen for this conversation.
     pub active_conversation_id: Option<AIConversationId>,
+    /// Fork: the task the pane's agent works on (task agent launcher). The fork's
+    /// fields are boxed so they don't grow `LeafContents::Terminal`.
+    #[allow(private_interfaces)]
+    pub task_session: Option<Box<TaskSession>>,
+    /// Fork: the pull request the pane's PR agent watches.
+    #[allow(private_interfaces)]
+    pub pr_watch: Option<Box<PrWatchSnapshot>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]

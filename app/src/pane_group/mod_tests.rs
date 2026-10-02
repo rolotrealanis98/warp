@@ -91,6 +91,7 @@ use crate::settings::PrivacySettings;
 use crate::settings_view::keybindings::KeybindingChangedNotifier;
 use crate::suggestions::ignored_suggestions_model::IgnoredSuggestionsModel;
 use crate::system::SystemStats;
+use crate::task_agent::{Checkout, TaskSession};
 use crate::terminal::alt_screen_reporting::AltScreenReporting;
 use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::terminal::history::History;
@@ -4122,5 +4123,90 @@ fn test_undo_close_keeps_a_file_pane_watching_its_file() {
                 "a permanently discarded pane should release its file"
             );
         });
+    });
+}
+
+fn example_task() -> TaskSession {
+    TaskSession {
+        key: Some("EXAMPLE-123".to_string()),
+        title: "Add a widget".to_string(),
+        url: None,
+        repo_root: PathBuf::from("/tmp/repo"),
+        branch: Some("feature/EXAMPLE-123-add-a-widget".to_string()),
+        checkout: Checkout::Here,
+    }
+}
+
+fn pane_group_restored_with_task(app: &mut App, task: TaskSession) -> ViewHandle<PaneGroup> {
+    mock_pane_group(
+        app,
+        MockOptions {
+            layout: PanesLayout::Snapshot(Box::new(PaneNodeSnapshot::Leaf(LeafSnapshot {
+                is_focused: true,
+                custom_vertical_tabs_title: None,
+                contents: LeafContents::Terminal(TerminalPaneSnapshot {
+                    uuid: vec![7],
+                    cwd: None,
+                    shell_launch_data: None,
+                    is_active: true,
+                    is_read_only: false,
+                    input_config: None,
+                    llm_model_override: None,
+                    active_profile_id: None,
+                    conversation_ids_to_restore: vec![],
+                    active_conversation_id: None,
+                    task_session: Some(Box::new(task)),
+                    pr_watch: None,
+                }),
+            }))),
+            ..Default::default()
+        },
+    )
+}
+
+#[test]
+fn test_restored_terminal_pane_keeps_its_task_session() {
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+        app.add_singleton_model(TaskSessionsModel::new);
+        let _flag = FeatureFlag::TaskAgentLauncher.override_enabled(true);
+
+        let pane_group = pane_group_restored_with_task(&mut app, example_task());
+
+        pane_group.read(&app, |panes, ctx| {
+            let PaneNodeSnapshot::Leaf(leaf) = panes.snapshot(ctx) else {
+                panic!("Expected a single pane");
+            };
+            let LeafContents::Terminal(terminal) = leaf.contents else {
+                panic!("Expected a terminal pane");
+            };
+            assert_eq!(terminal.task_session.as_deref(), Some(&example_task()));
+        });
+    });
+}
+
+#[test]
+fn test_closing_a_terminal_pane_for_good_drops_its_task_session() {
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+        app.add_singleton_model(TaskSessionsModel::new);
+        let _flag = FeatureFlag::TaskAgentLauncher.override_enabled(true);
+        let pane_group = pane_group_restored_with_task(&mut app, example_task());
+
+        let task_after_close = pane_group.update(&mut app, |panes, ctx| {
+            let pane_id = get_newly_created_pane_id(panes, &[]);
+            let terminal_view_id = panes
+                .terminal_view_from_pane_id(pane_id, ctx)
+                .expect("restored pane should be a terminal")
+                .id();
+            panes.add_terminal_pane(Direction::Right, None, ctx);
+            panes.close_pane(pane_id, ctx);
+            panes.cleanup_closed_pane(pane_id, ctx);
+            TaskSessionsModel::as_ref(ctx)
+                .get(terminal_view_id)
+                .cloned()
+        });
+
+        assert_eq!(task_after_close, None);
     });
 }

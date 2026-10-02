@@ -433,6 +433,10 @@ pub struct TerminalPane {
     pub conversation_ids: Option<String>,
     /// The active conversation ID if the agent view was open in fullscreen mode.
     pub active_conversation_id: Option<String>,
+    /// Fork: serialized JSON data for the pane's task agent `TaskSession`.
+    pub task_session: Option<String>,
+    /// Fork: serialized JSON data for the pane's PR agent `PrWatchSnapshot`.
+    pub pr_watch: Option<String>,
 }
 
 #[derive(Identifiable, Queryable, Selectable)]
@@ -611,6 +615,10 @@ pub struct NewTerminalPane {
     pub conversation_ids: Option<String>,
     /// The active conversation ID if the agent view was open in fullscreen mode.
     pub active_conversation_id: Option<String>,
+    /// Fork: serialized JSON data for the pane's task agent `TaskSession`.
+    pub task_session: Option<String>,
+    /// Fork: serialized JSON data for the pane's PR agent `PrWatchSnapshot`.
+    pub pr_watch: Option<String>,
 }
 
 #[derive(Insertable)]

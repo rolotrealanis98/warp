@@ -1270,6 +1270,14 @@ fn save_pane_state(
                 active_conversation_id: terminal_snapshot
                     .active_conversation_id
                     .map(|id| id.to_string()),
+                task_session: terminal_snapshot
+                    .task_session
+                    .as_ref()
+                    .and_then(|task| serde_json::to_string(task).ok()),
+                pr_watch: terminal_snapshot
+                    .pr_watch
+                    .as_ref()
+                    .and_then(|watch| serde_json::to_string(watch).ok()),
             };
 
             diesel::insert_into(schema::terminal_panes::dsl::terminal_panes)
@@ -2251,6 +2259,12 @@ fn read_node(conn: &mut SqliteConnection, node: model::PaneNode) -> Result<PaneN
                         active_profile_id,
                         conversation_ids_to_restore,
                         active_conversation_id,
+                        task_session: terminal_pane
+                            .task_session
+                            .and_then(|task| serde_json::from_str(&task).ok()),
+                        pr_watch: terminal_pane
+                            .pr_watch
+                            .and_then(|watch| serde_json::from_str(&watch).ok()),
                     })
                 }
                 NOTEBOOK_PANE_KIND => {

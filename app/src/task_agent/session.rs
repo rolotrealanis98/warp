@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use serde::{Deserialize, Serialize};
 use warp_core::ui::theme::color::internal_colors;
 use warpui::elements::{CornerRadius, Element, Hoverable, MouseStateHandle, Radius};
 use warpui::platform::Cursor;
@@ -19,8 +20,8 @@ use crate::terminal::TerminalView;
 use crate::terminal::cli_agent_sessions::{CLIAgentSessionsModel, CLIAgentSessionsModelEvent};
 use crate::workspace::WorkspaceAction;
 
-/// The task a terminal pane's agent is working on.
-#[derive(Clone, Debug, PartialEq)]
+/// The task a terminal pane's agent is working on. Saved with the pane, so it survives restarts.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub(crate) struct TaskSession {
     pub key: Option<String>,
     pub title: String,
@@ -35,8 +36,7 @@ struct Entry {
     key_chip_mouse_state: MouseStateHandle,
 }
 
-/// Task metadata keyed by terminal view id.
-// ponytail: entries outlive closed panes (a few strings each); prune on pane close if that grows.
+/// Task metadata keyed by terminal view id. Entries are dropped when their pane closes.
 #[derive(Default)]
 pub(crate) struct TaskSessionsModel {
     sessions: HashMap<EntityId, Entry>,
@@ -74,6 +74,25 @@ impl TaskSessionsModel {
                 task,
                 key_chip_mouse_state: Default::default(),
             });
+    }
+
+    /// Forgets a closed pane.
+    pub(crate) fn remove(&mut self, terminal_view_id: EntityId) {
+        self.sessions.remove(&terminal_view_id);
+        self.pending_prompts.remove(&terminal_view_id);
+    }
+
+    /// The pane's task as saved with the session.
+    pub(crate) fn snapshot(terminal_view_id: EntityId, app: &AppContext) -> Option<TaskSession> {
+        Self::entry(terminal_view_id, app).map(|entry| entry.task.clone())
+    }
+
+    /// Re-attaches a task saved by [`Self::snapshot`] to a restored pane.
+    pub(crate) fn restore(terminal_view_id: EntityId, task: TaskSession, app: &mut AppContext) {
+        if !FeatureFlag::TaskAgentLauncher.is_enabled() || !app.has_singleton_model::<Self>() {
+            return;
+        }
+        Self::handle(app).update(app, |sessions, _| sessions.set(terminal_view_id, task));
     }
 
     pub(crate) fn set_pending_prompt(

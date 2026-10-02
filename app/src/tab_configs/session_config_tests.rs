@@ -413,6 +413,8 @@ fn make_terminal_leaf(cwd: Option<&str>, is_focused: bool) -> PaneNodeSnapshot {
             active_profile_id: None,
             conversation_ids_to_restore: vec![],
             active_conversation_id: None,
+            task_session: None,
+            pr_watch: None,
         }),
     })
 }
@@ -615,6 +617,8 @@ fn make_agent_leaf(cwd: Option<&str>, is_focused: bool) -> PaneNodeSnapshot {
             active_profile_id: None,
             conversation_ids_to_restore: vec![],
             active_conversation_id: Some(AIConversationId::new()),
+            task_session: None,
+            pr_watch: None,
         }),
     })
 }

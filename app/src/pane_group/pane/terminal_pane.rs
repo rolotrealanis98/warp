@@ -53,10 +53,12 @@ use crate::pane_group::child_agent::{
 };
 use crate::pane_group::{self, Direction, PaneGroup};
 use crate::persistence::{BlockCompleted, ModelEvent};
+use crate::pr_agent::PrAgentModel;
 #[cfg(not(target_family = "wasm"))]
 use crate::server::server_api::ServerApiProvider;
 use crate::server::team_scope::RequestTeamScope;
 use crate::session_management::SessionNavigationData;
+use crate::task_agent::TaskSessionsModel;
 use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::terminal::general_settings::GeneralSettings;
 #[cfg(not(target_family = "wasm"))]
@@ -408,6 +410,17 @@ impl PaneContent for TerminalPane {
             ctx.unsubscribe_to_view(&view);
         }
 
+        // Fork: a closed pane's task metadata goes with it (PR watches stop on their next poll).
+        if matches!(detach_type, DetachType::Closed)
+            && ctx.has_singleton_model::<TaskSessionsModel>()
+        {
+            TaskSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+                for terminal_view_id in &terminal_view_ids {
+                    sessions.remove(*terminal_view_id);
+                }
+            });
+        }
+
         // Notify the active agent views model that the terminal view has been closed
         // (and that any active views are no longer active). On a `HiddenForClose` detach,
         // `attach` will re-register via `register_agent_view_controller` when the tab is
@@ -478,6 +491,8 @@ impl PaneContent for TerminalPane {
                 active_profile_id: None,
                 conversation_ids_to_restore: vec![],
                 active_conversation_id: None,
+                task_session: None,
+                pr_watch: None,
             })
         } else if let Some(task_id) = view
             .ambient_agent_view_model()
@@ -508,6 +523,8 @@ impl PaneContent for TerminalPane {
                     active_profile_id: None,
                     conversation_ids_to_restore: vec![],
                     active_conversation_id: None,
+                    task_session: None,
+                    pr_watch: None,
                 })
             }
         } else {
@@ -549,6 +566,9 @@ impl PaneContent for TerminalPane {
                 active_profile_id,
                 conversation_ids_to_restore,
                 active_conversation_id,
+                task_session: TaskSessionsModel::snapshot(self.terminal_view(app).id(), app)
+                    .map(Box::new),
+                pr_watch: PrAgentModel::snapshot(self.terminal_view(app).id(), app).map(Box::new),
             })
         }
     }

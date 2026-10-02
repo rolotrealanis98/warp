@@ -104,6 +104,7 @@ use crate::pane_group::pane::terminal_pane::{
     host_terminal_shared_session_source_type, inherit_share_for_local_child,
 };
 use crate::persistence::ModelEvent;
+use crate::pr_agent::PrAgentModel;
 use crate::quit_warning::UnsavedStateSummary;
 use crate::resource_center::{
     Tip, TipAction, TipsCompleted, mark_feature_used_and_write_to_user_defaults,
@@ -120,6 +121,7 @@ use crate::settings::{AISettings, DefaultSessionMode, PaneSettings};
 use crate::settings_view::SettingsSection;
 use crate::settings_view::mcp_servers_page::MCPServersSettingsPage;
 use crate::shell_indicator::ShellIndicatorType;
+use crate::task_agent::TaskSessionsModel;
 use crate::terminal::available_shells::{AvailableShell, AvailableShells};
 #[cfg(not(target_family = "wasm"))]
 use crate::terminal::cli_agent_sessions::plugin_manager::PluginModalKind;
@@ -1708,6 +1710,14 @@ impl PaneGroup {
 
                 let terminal_view_id = terminal_view.id();
 
+                // Fork: task metadata and PR watches survive a restart.
+                if let Some(task) = terminal_snapshot.task_session {
+                    TaskSessionsModel::restore(terminal_view_id, *task, ctx);
+                }
+                if let Some(pr_watch) = terminal_snapshot.pr_watch {
+                    PrAgentModel::restore(&terminal_view, *pr_watch, ctx);
+                }
+
                 let pane_data = TerminalPane::new(
                     uuid.0,
                     terminal_manager,
@@ -2183,6 +2193,8 @@ impl PaneGroup {
                             active_profile_id: None,
                             conversation_ids_to_restore: Vec::new(),
                             active_conversation_id: None,
+                            task_session: None,
+                            pr_watch: None,
                         })
                     }
                 };

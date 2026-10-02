@@ -3,7 +3,7 @@
 use std::fmt;
 
 /// A pull request on github.com.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub(crate) struct PrRef {
     pub owner: String,
     pub repo: String,

@@ -164,7 +164,7 @@ pub(crate) fn claude_code_here(dir: PathBuf, prompt: String, app: &AppContext) -
 }
 
 /// Where the agent works. An empty `base` means the current `HEAD` of the repository.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub(crate) enum Checkout {
     /// A new branch in a new `git worktree` next to the repository.
     Worktree { base: String },

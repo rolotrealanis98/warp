@@ -20,9 +20,9 @@ use std::time::Duration;
 use futures::FutureExt as _;
 use futures::future::BoxFuture;
 pub(crate) use modal::{PrAgentModal, PrAgentModalEvent};
-pub(crate) use model::{PrAgentModel, PrWatchRequest};
+pub(crate) use model::{PrAgentModel, PrWatchRequest, PrWatchSnapshot};
 pub(crate) use parse::{PrRef, parse_pr_ref};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use warpui::keymap::macros::*;
 use warpui::keymap::{BindingDescription, EditableBinding};
 use warpui::{AppContext, SingletonEntity};
@@ -138,7 +138,7 @@ impl PromptKind {
 }
 
 /// What the modal shows and the prompt template uses about a pull request.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct PrDetails {
     pub pr: PrRef,
     pub title: String,

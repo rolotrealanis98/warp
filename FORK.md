@@ -64,6 +64,8 @@ The tab is titled from `session_title_template` and the pane header shows the
 task key as a chip (click to copy). Claude Code and Codex receive the initial
 prompt as their first argument, read from a file in Warp's cache directory;
 other agents get it typed into their input once their session starts.
+The task metadata (and its key chip) is saved with the pane and survives a
+restart.
 
 Settings (`task_agents.*` in `settings.toml`, never synced):
 
@@ -116,7 +118,8 @@ agent as one message once it is idle (its turn ended and the rich input is
 closed); what the agent does with them is up to the prompt. Idle detection needs
 the Warp plugin for the agent. The pane header shows chips for checks, review
 decision and unread updates (also above the chat view); clicking them opens the
-pull request.
+pull request. The watch and its unread count are saved with the pane and resume
+after a restart (the first poll after a restart is a new baseline).
 
 When the agent's turn ends, review comments it posted with `gh` (authored by
 the `gh` user) are copied into the Code Review panel for the checkout.

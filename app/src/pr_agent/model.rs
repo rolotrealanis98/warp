@@ -4,6 +4,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
+use serde::{Deserialize, Serialize};
 use warp_core::safe_warn;
 use warp_core::ui::theme::color::internal_colors;
 use warpui::r#async::{SpawnedFutureHandle, Timer};
@@ -25,7 +26,7 @@ use super::settings::PrAgentSettings;
 use super::watcher::{
     ChecksState, PR_VIEW_FIELDS, PrEvent, PrSnapshot, diff_snapshots, format_events,
 };
-use super::{PrDetails, pr_view_args, run_gh};
+use super::{PrDetails, pr_view_args, run_gh, viewer_args};
 use crate::appearance::Appearance;
 use crate::features::FeatureFlag;
 use crate::terminal::TerminalView;
@@ -44,6 +45,16 @@ pub(crate) struct PrWatchRequest {
     pub repo_root: PathBuf,
     /// Where the pull request is checked out (the worktree, or `repo_root`).
     pub checkout_path: PathBuf,
+}
+
+/// What is saved with a PR agent pane so its watch resumes after a restart. The `gh` user is
+/// read again on restore; the last poll result is not kept (the first poll is a new baseline).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub(crate) struct PrWatchSnapshot {
+    pub details: PrDetails,
+    pub repo_root: PathBuf,
+    pub checkout_path: PathBuf,
+    pub unread: usize,
 }
 
 struct Watch {
@@ -114,6 +125,59 @@ impl PrAgentModel {
             },
         );
         self.poll(id, ctx);
+    }
+
+    /// Resumes a watch saved by [`Self::snapshot`] for `terminal`, then re-reads the `gh` user
+    /// the agent posts as.
+    pub(crate) fn restore(
+        terminal: &ViewHandle<TerminalView>,
+        snapshot: PrWatchSnapshot,
+        app: &mut AppContext,
+    ) {
+        if !FeatureFlag::PrReviewAgent.is_enabled() || !app.has_singleton_model::<Self>() {
+            return;
+        }
+        let id = terminal.id();
+        let repo_root = snapshot.repo_root.clone();
+        Self::handle(app).update(app, |me, ctx| {
+            let request = PrWatchRequest {
+                details: snapshot.details,
+                viewer: None,
+                repo_root: snapshot.repo_root,
+                checkout_path: snapshot.checkout_path,
+            };
+            me.watch(terminal, request, ctx);
+            if let Some(watch) = me.watches.get_mut(&id) {
+                watch.unread = snapshot.unread;
+            }
+            let fetch = run_gh(ctx, repo_root, viewer_args());
+            ctx.spawn(fetch, move |me, result, _| match result {
+                Ok(login) => {
+                    if let Some(watch) = me.watches.get_mut(&id) {
+                        watch.request.viewer =
+                            Some(login.trim().to_string()).filter(|login| !login.is_empty());
+                    }
+                }
+                Err(err) => safe_warn!(
+                    safe: ("PR agent: failed to read the gh user for a restored watch"),
+                    full: ("PR agent: failed to read the gh user for a restored watch: {err:#}")
+                ),
+            });
+        });
+    }
+
+    /// The pane's watch as saved with the session, if it runs a PR agent.
+    pub(crate) fn snapshot(
+        terminal_view_id: EntityId,
+        app: &AppContext,
+    ) -> Option<PrWatchSnapshot> {
+        let watch = Self::watch_for(terminal_view_id, app)?;
+        Some(PrWatchSnapshot {
+            details: watch.request.details.clone(),
+            repo_root: watch.request.repo_root.clone(),
+            checkout_path: watch.request.checkout_path.clone(),
+            unread: watch.unread,
+        })
     }
 
     /// Clears the unread count and returns the pull request's URL.

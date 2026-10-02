@@ -28,8 +28,10 @@ use crate::persistence::model::ObjectPermissions;
 use crate::persistence::{
     BlockCompleted, ModelEvent, PersistedDataScope, PersistenceScope, StartedCommandMetadata,
 };
+use crate::pr_agent::{PrDetails, PrRef, PrWatchSnapshot};
 use crate::server::ids::{ClientId, ServerId};
 use crate::tab::SelectedTabColor;
+use crate::task_agent::{Checkout, TaskSession};
 use crate::terminal::ShellLaunchData;
 use crate::terminal::model::block::SerializedBlock;
 use crate::terminal::model::session::SessionId;
@@ -394,6 +396,8 @@ fn test_terminal_window_snapshot(vertical_tabs_panel_open: bool) -> WindowSnapsh
                     active_profile_id: None,
                     conversation_ids_to_restore: vec![],
                     active_conversation_id: None,
+                    task_session: None,
+                    pr_watch: None,
                 }),
             }),
             default_directory_color: None,
@@ -509,6 +513,8 @@ fn test_sqlite_round_trips_custom_vertical_tabs_title() {
                         active_profile_id: None,
                         conversation_ids_to_restore: vec![],
                         active_conversation_id: None,
+                        task_session: None,
+                        pr_watch: None,
                     }),
                 }),
                 default_directory_color: None,
@@ -675,6 +681,8 @@ fn test_sqlite_round_trips_tab_groups() {
                 active_profile_id: None,
                 conversation_ids_to_restore: vec![],
                 active_conversation_id: None,
+                task_session: None,
+                pr_watch: None,
             }),
         }),
         default_directory_color: None,
@@ -703,6 +711,8 @@ fn test_sqlite_round_trips_tab_groups() {
                 active_profile_id: None,
                 conversation_ids_to_restore: vec![],
                 active_conversation_id: None,
+                task_session: None,
+                pr_watch: None,
             }),
         }),
         default_directory_color: None,
@@ -799,6 +809,8 @@ fn test_sqlite_round_trips_pinned_state() {
                 active_profile_id: None,
                 conversation_ids_to_restore: vec![],
                 active_conversation_id: None,
+                task_session: None,
+                pr_watch: None,
             }),
         }),
         default_directory_color: None,
@@ -827,6 +839,8 @@ fn test_sqlite_round_trips_pinned_state() {
                 active_profile_id: None,
                 conversation_ids_to_restore: vec![],
                 active_conversation_id: None,
+                task_session: None,
+                pr_watch: None,
             }),
         }),
         default_directory_color: None,
@@ -855,6 +869,8 @@ fn test_sqlite_round_trips_pinned_state() {
                 active_profile_id: None,
                 conversation_ids_to_restore: vec![],
                 active_conversation_id: None,
+                task_session: None,
+                pr_watch: None,
             }),
         }),
         default_directory_color: None,
@@ -1158,4 +1174,77 @@ fn team_member_is_disabled_round_trips_through_sqlite_cache() {
         .expect("disabled member should be present");
     assert!(!active_member.is_disabled);
     assert!(disabled_member.is_disabled);
+}
+
+fn terminal_pane_snapshot(window: &WindowSnapshot) -> &TerminalPaneSnapshot {
+    let PaneNodeSnapshot::Leaf(LeafSnapshot {
+        contents: LeafContents::Terminal(terminal),
+        ..
+    }) = &window.tabs[0].root
+    else {
+        panic!("Expected terminal pane leaf");
+    };
+    terminal
+}
+
+#[test]
+fn test_sqlite_round_trips_task_session_and_pr_watch() {
+    let tempdir = tempfile::tempdir().expect("tempdir should be created");
+    let database_path = tempdir.path().join("warp.sqlite");
+    let mut conn = setup_database(&database_path).expect("database should initialize");
+    let task_session = TaskSession {
+        key: Some("EXAMPLE-123".to_string()),
+        title: "Add a widget".to_string(),
+        url: Some("https://issues.example.com/browse/EXAMPLE-123".to_string()),
+        repo_root: PathBuf::from("/tmp/repo"),
+        branch: Some("feature/EXAMPLE-123-add-a-widget".to_string()),
+        checkout: Checkout::Worktree {
+            base: "origin/main".to_string(),
+        },
+    };
+    let pr_watch = PrWatchSnapshot {
+        details: PrDetails {
+            pr: PrRef {
+                owner: "octo".to_string(),
+                repo: "repo".to_string(),
+                number: 12,
+            },
+            title: "Add a widget".to_string(),
+            url: "https://github.com/octo/repo/pull/12".to_string(),
+            author: "octocat".to_string(),
+            base: "main".to_string(),
+            state: "OPEN".to_string(),
+        },
+        repo_root: PathBuf::from("/tmp/repo"),
+        checkout_path: PathBuf::from("/tmp/repo-review-12"),
+        unread: 3,
+    };
+    let mut agent_window = test_terminal_window_snapshot(false);
+    if let PaneNodeSnapshot::Leaf(LeafSnapshot {
+        contents: LeafContents::Terminal(terminal),
+        ..
+    }) = &mut agent_window.tabs[0].root
+    {
+        terminal.task_session = Some(Box::new(task_session.clone()));
+        terminal.pr_watch = Some(Box::new(pr_watch.clone()));
+    }
+    let app_state = AppState {
+        windows: vec![agent_window, test_terminal_window_snapshot(true)],
+        active_window_index: Some(0),
+        block_lists: Default::default(),
+        running_mcp_servers: Default::default(),
+    };
+
+    save_app_state(&mut conn, &app_state).expect("app state should save");
+    let restored = read_sqlite_data(&mut conn, None, PersistedDataScope::Full)
+        .expect("app state should load")
+        .app_state
+        .expect("app state should be present for the full scope");
+
+    let agent_pane = terminal_pane_snapshot(&restored.windows[0]);
+    let plain_pane = terminal_pane_snapshot(&restored.windows[1]);
+    assert_eq!(agent_pane.task_session.as_deref(), Some(&task_session));
+    assert_eq!(agent_pane.pr_watch.as_deref(), Some(&pr_watch));
+    assert_eq!(plain_pane.task_session, None);
+    assert_eq!(plain_pane.pr_watch, None);
 }
