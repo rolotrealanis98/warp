@@ -125,6 +125,37 @@ Template variables: `{{number}}`, `{{title}}`, `{{url}}`, `{{author}}`,
 `{{base}}`, `{{repo}}` (`owner/repo`), `{{checkout_path}}`, `{{branch}}`.
 Replace the templates locally with your own review instructions.
 
+### CLI agents on Warp's agent surfaces
+
+Warp's generic agent surfaces drive CLI agents instead of Warp's agent:
+
+- **Agent dashboard** (`Cmd/Ctrl-Shift-M`, or **Agent > Open agent
+  dashboard**) and the **conversation list** in the left panel list every
+  pane running a CLI agent (titled by its task key and title when started from
+  a task, else by its latest prompt) and past Claude Code sessions stored under
+  `~/.claude/projects` (or `$CLAUDE_CONFIG_DIR`) for the workspace's known
+  repositories and the directories CLI agents ran in. Opening a running session
+  focuses its pane; opening a past one opens a tab in its directory running
+  `claude --resume <session id>`. Past sessions are titled from their title
+  record, else their first prompt; the 50 newest are listed. "New agent" opens
+  the task launcher and "New Claude Code tab" starts one in the current
+  directory.
+- **Agent keystroke** (`Cmd-Enter` / `Ctrl-Shift-Enter`) and **start Claude
+  Code** in a new session's welcome block: an idle pane runs `claude` with the
+  typed input as its first message; a pane running a CLI agent toggles its chat
+  view; a pane running another command does what "Ask Claude Code" does.
+- **Ask Claude Code** (footer of a long-running command): opens a tab in the
+  pane's directory running Claude Code with the command and its output so far.
+- **Slash commands**: `/claude [first message]`, `/task` (task launcher),
+  `/chat` (chat view; also inside the CLI agent composer) and `/resume` (the
+  conversation menu on its "Current Directory" tab).
+- **Code review panel**: "Send to agent" goes to the CLI agent in a free
+  terminal of the repository, or starts Claude Code with the comments in an idle
+  one.
+
+Prompts reach Claude Code through a file, so these start it from local
+sessions only.
+
 Build without the fork features:
 
 ```sh
